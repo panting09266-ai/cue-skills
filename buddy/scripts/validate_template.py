@@ -561,10 +561,34 @@ def validate(payload: dict) -> list[Finding]:
 
 
 def _cli() -> int:
-    if len(sys.argv) < 2:
-        print(__doc__)
+    import argparse
+
+    parser = argparse.ArgumentParser(
+        prog="validate_template.py",
+        description=(
+            "Lint a Cue buddy template JSON against the 7 hard rules + R9 "
+            "(see ../references/hard-rules.md). Exit 0 if valid (warnings "
+            "allowed) or 1 if any error-level finding."
+        ),
+        epilog=(
+            "Examples:\n"
+            "  python3 validate_template.py path/to/template.json\n"
+            "  cat template.json | python3 validate_template.py -\n"
+            "  python3 -c 'from validate_template import validate; print(validate(payload))'"
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    parser.add_argument(
+        "src",
+        nargs="?",
+        help="Path to a JSON template file, or '-' to read from stdin",
+    )
+    args = parser.parse_args()
+
+    if args.src is None:
+        parser.print_help()
         return 0
-    src = sys.argv[1]
+    src = args.src
     if src == "-":
         payload = json.loads(sys.stdin.read())
     else:

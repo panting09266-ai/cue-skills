@@ -86,13 +86,23 @@ def _start_minimal_backend() -> str:
         import uvicorn
         from fastapi import FastAPI
     except ImportError as e:
+        # codex r2 finding: 默认 exit 2 = "未验证",防 CI false-pass。
+        # Dev box 跳过显式 CUE_SKILL_TEST_SKIP_OK=1。
+        if os.environ.get("CUE_SKILL_TEST_SKIP_OK") == "1":
+            print(
+                f"[skip-ok] uvicorn + fastapi missing ({e}) — "
+                f"CUE_SKILL_TEST_SKIP_OK=1 set, exiting 0",
+                file=sys.stderr,
+            )
+            sys.exit(0)
         print(
-            f"[skip] this probe requires uvicorn + fastapi (not stdlib): {e}\n"
-            f"       install: pip install uvicorn fastapi\n"
-            f"       or run inside cubemanus .venv",
+            f"[NOT VERIFIED] coverage probe not exercised — "
+            f"uvicorn + fastapi missing ({e}).\n"
+            f"       install: pip install uvicorn fastapi (or run in cubemanus .venv)\n"
+            f"       to silence in non-CI dev env: export CUE_SKILL_TEST_SKIP_OK=1",
             file=sys.stderr,
         )
-        sys.exit(0)
+        sys.exit(2)
 
     from src.api.routes.tools import router as tools_router  # noqa: E402
 

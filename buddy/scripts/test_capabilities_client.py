@@ -53,13 +53,24 @@ def _start_minimal_backend() -> tuple[str, threading.Thread]:
         import uvicorn
         from fastapi import FastAPI
     except ImportError as e:
+        # codex r2 finding: 默认 sys.exit(0) 让 CI 误以为 contract 测了。
+        # 改成默认 exit 2 = "未验证",CI 不会 false-pass。如要在 dev box
+        # 跳过(deps 装不全的开发者),显式设 CUE_SKILL_TEST_SKIP_OK=1。
+        if os.environ.get("CUE_SKILL_TEST_SKIP_OK") == "1":
+            print(
+                f"[skip-ok] uvicorn + fastapi missing ({e}) — "
+                f"CUE_SKILL_TEST_SKIP_OK=1 set, exiting 0",
+                file=sys.stderr,
+            )
+            sys.exit(0)
         print(
-            f"[skip] this test requires uvicorn + fastapi (not stdlib): {e}\n"
-            f"       install: pip install uvicorn fastapi\n"
-            f"       or run inside cubemanus .venv which already has them",
+            f"[NOT VERIFIED] capabilities contract not exercised — "
+            f"uvicorn + fastapi missing ({e}).\n"
+            f"       install: pip install uvicorn fastapi (or run in cubemanus .venv)\n"
+            f"       to silence in non-CI dev env: export CUE_SKILL_TEST_SKIP_OK=1",
             file=sys.stderr,
         )
-        sys.exit(0)
+        sys.exit(2)
 
     from src.api.routes.tools import router as tools_router  # noqa: E402
 

@@ -1,8 +1,9 @@
 ---
 name: cue-buddy
-version: 0.1.0
-description: "Cue 搭子模板作者工具：在任何 AI agent (Claude Code / Codex / Gemini / OpenClaw) 里通过 Cue 生产 API 起草、校验、创建、调试自己的搭子模板，并提交到个人模板库。用户场景包括：基于业务场景定义一个新的搭子（如对公授信预尽调、主体合规风险公开快照、季度财报点评、市场异动、政府采购线索、私募尽调等）、调试已有搭子在真实任务上的表现、把调好的模板发布到自己的工作台。触发短语：创建搭子 / 做一个 X 搭子 / 调试模板 / 测试我的搭子 / 提交模板 / 发布搭子。"
+description: "Use when the user wants to author / validate / debug / publish a Cue 搭子(buddy) research template (corporate-credit pre-diligence, public-record compliance snapshot, earnings review, gov-procurement lead scan, private-fund DD, etc.) via natural conversation. Triggers: 创建搭子 / 做一个 X 搭子 / 调试模板 / 测试我的搭子 / 提交模板 / 发布搭子 / design a buddy for X / publish my template. Cubemanus public-data tool surface only — refuse for private-data scenarios (real AML / medical diagnosis / internal accounting)."
+license: MIT
 metadata:
+  version: "0.1.0"
   requires:
     bins: ["python3"]
     envOptional: ["CUE_API_KEY", "CUE_API_BASE"]
