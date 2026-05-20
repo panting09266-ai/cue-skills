@@ -1,7 +1,9 @@
 name: skill-regression
 
-# Run cue-buddy stdlib regression on every push / PR. Skill scripts are
-# stdlib-only Python (no pip install needed), so the matrix stays cheap.
+# Matrix over all skills in this monorepo. Per-skill stdlib regression runs
+# on every push / PR; skill-specific extras (CLI smokes, contract tests)
+# gated by `if: matrix.skill == '<name>'`. Adding a new skill = sibling
+# top-level dir + append to `matrix.skill` list below.
 
 on:
   push:
@@ -14,9 +16,12 @@ jobs:
   test:
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false  # 一个 skill 挂不挡其他 skill 的反馈
       matrix:
-        # Track the same Python versions the cubemanus backend pins (3.12) plus
-        # one rolling latest to catch syntax regressions early.
+        # 加新 skill: 在这里 append skill 文件夹名,sibling 到 buddy/
+        # 每个 skill 须有 scripts/test_skill_regression.py + SKILL.md frontmatter
+        skill: [buddy]
+        # 跟 cubemanus backend pinned 3.12 一致,plus 一个 rolling latest
         python-version: ["3.12", "3.13"]
     steps:
       - uses: actions/checkout@v4
@@ -25,75 +30,86 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
+      # ============================================================
+      # Shared per-skill gates (run for every skill in the matrix)
+      # ============================================================
+
       - name: Skill frontmatter validator (Codex/Anthropic schema)
         # codex r3 finding: validator-blocker (e.g. top-level `version` key)
-        # 之前未在 CI 跑,只本地 catch。把它放到 CI 防 frontmatter 类阻断
-        # 在 push 后才被发现。Validator 用 PyYAML — 装一个最小 dep。
+        # 之前未在 CI 跑,只本地 catch。每个 skill 的 SKILL.md frontmatter 都跑。
         run: |
           python3 -m pip install --quiet pyyaml
-          python3 - <<'PY'
-          import re, sys, pathlib
-          import yaml
-          md = pathlib.Path('buddy/SKILL.md').read_text(encoding='utf-8')
+          python3 - <<PY
+          import re, sys, pathlib, yaml
+          skill = '${{ matrix.skill }}'
+          md = pathlib.Path(f'{skill}/SKILL.md').read_text(encoding='utf-8')
           m = re.match(r'^---\n(.*?)\n---\n', md, re.S)
-          assert m, 'SKILL.md missing frontmatter'
+          assert m, f'{skill}/SKILL.md missing frontmatter'
           fm = yaml.safe_load(m.group(1))
           allowed = {'allowed-tools', 'description', 'license', 'metadata', 'name'}
           unexpected = set(fm.keys()) - allowed
-          assert not unexpected, f'frontmatter has unexpected keys: {unexpected}'
-          assert 'name' in fm and 'description' in fm, 'name/description required'
-          print(f'SKILL.md frontmatter OK; keys={sorted(fm.keys())}')
+          assert not unexpected, f'{skill}/SKILL.md frontmatter has unexpected keys: {unexpected}'
+          assert 'name' in fm and 'description' in fm, f'{skill}/SKILL.md name/description required'
+          print(f'{skill}/SKILL.md frontmatter OK; keys={sorted(fm.keys())}')
           PY
 
-      - name: Run cue-buddy skill regression
-        run: python3 buddy/scripts/test_skill_regression.py
+      - name: Run ${{ matrix.skill }} skill regression
+        # 每个 skill 须有 scripts/test_skill_regression.py (stdlib unittest)
+        run: python3 ${{ matrix.skill }}/scripts/test_skill_regression.py
 
-      - name: Run cue_api client contract test (stdlib mock server)
+      # ============================================================
+      # buddy-specific extras (cue-buddy template authoring skill)
+      # 加新 skill 时若有独有 contract/CLI smoke,再加一组 `if:` 块
+      # ============================================================
+
+      - name: (buddy) cue_api client contract test (stdlib mock server)
+        if: matrix.skill == 'buddy'
         # codex r3: 把"capabilities 合约"放进 CI 而非只 local dev 可跑。
-        # 这个 test 用 http.server + threading mock 服务器,不依赖 cubemanus
-        # 或 uvicorn/fastapi,完全 CI-friendly。验证 client wire format:
-        # URL/Bearer/query 序列化/ETag 304/4xx 错误传播。
-        run: python3 buddy/scripts/test_cue_api_client_contract.py
+        # http.server + threading mock,不依赖 cubemanus/uvicorn/fastapi。
+        # 验 client wire format:URL/Bearer/query 序列化/ETag 304/4xx 错误传播。
+        run: python3 ${{ matrix.skill }}/scripts/test_cue_api_client_contract.py
 
-      - name: CLI smoke — validate_template.py --help
-        # codex r3: argparse --help 之前被当文件路径读 FileNotFoundError,
-        # 现已修。CI smoke 防 argparse 集成回归。
+      - name: (buddy) CLI smoke — validate_template.py --help
+        if: matrix.skill == 'buddy'
+        # codex r2: argparse --help 之前被当文件路径读 FileNotFoundError,现已修。
         run: |
-          python3 buddy/scripts/validate_template.py --help | grep -q "validate_template.py"
-          # 无参也应 print help + exit 0,不报错
-          python3 buddy/scripts/validate_template.py >/dev/null
+          python3 ${{ matrix.skill }}/scripts/validate_template.py --help | grep -q "validate_template.py"
+          python3 ${{ matrix.skill }}/scripts/validate_template.py >/dev/null
 
-      - name: CLI smoke — cue_api.py capabilities subcommand
+      - name: (buddy) CLI smoke — cue_api.py capabilities subcommand
+        if: matrix.skill == 'buddy'
         # codex r3: doc 说有 +capabilities verb 但缺 CLI,现已加。
-        # 无 API key 应 exit 2 + 提示去拿 key,而非 KeyError。
+        # 无 API key 应 exit 2 + 'API key' 提示,而非 KeyError。
         run: |
           set +e
-          out=$(python3 buddy/scripts/cue_api.py capabilities 2>&1)
+          out=$(python3 ${{ matrix.skill }}/scripts/cue_api.py capabilities 2>&1)
           ec=$?
           set -e
           echo "$out"
           test "$ec" -ne 0
           echo "$out" | grep -qi "API key"
 
-      - name: CLI smoke — cue_api.py replay subcommand known
-        # codex r5: test_template.py fallback hint 写 'cue_api.py replay <conv_id>'
-        # 之前 CLI 没 replay 子命令,user 跑出 unknown cmd。现已加。
-        # 无 conv_id 应 print usage + exit 2,不是 'unknown cmd'。
+      - name: (buddy) CLI smoke — cue_api.py replay subcommand known
+        if: matrix.skill == 'buddy'
+        # codex r5: test_template.py fallback hint 写 'cue_api.py replay <conv_id>',
+        # 之前 CLI 没此子命令报 unknown cmd。现已加 → 无 conv_id 应 print usage + exit 2。
         run: |
           set +e
-          out=$(python3 buddy/scripts/cue_api.py replay 2>&1)
+          out=$(python3 ${{ matrix.skill }}/scripts/cue_api.py replay 2>&1)
           ec=$?
           set -e
           echo "$out"
-          # 期望 usage hint 不是 unknown cmd
           echo "$out" | grep -q "usage: cue_api.py replay"
           test "$ec" -eq 2
 
-      - name: Validator self-check (sanity import + regex 5-family coverage)
+      - name: (buddy) Validator self-check (regex 5-family coverage)
+        if: matrix.skill == 'buddy'
+        # codex r3 r1 Block A: TOOL_NAME_LEAK_RE 应覆盖 get_*/list_*/find_*/
+        # search_tool*/crawl_tool* 5 工具家族(过去 regex 漏后两类)。
         run: |
           python3 -c "
           import sys
-          sys.path.insert(0, 'buddy/scripts')
+          sys.path.insert(0, '${{ matrix.skill }}/scripts')
           from validate_template import validate, FORBIDDEN_TOOL_PREFIXES, TOOL_NAME_LEAK_RE
           assert callable(validate)
           assert 'search_tool' in FORBIDDEN_TOOL_PREFIXES
