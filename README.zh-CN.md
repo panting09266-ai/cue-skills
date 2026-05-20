@@ -10,7 +10,7 @@
 
 | Skill | 用途 | 状态 |
 |---|---|---|
-| [`buddy/`](./buddy) — **cue-buddy** | 让业务专家通过自然对话起草、校验、测试、调优、发布 [Cue](https://cuecue.cn) 搭子（buddy）调研模板。不需要 Python / 不需要懂 API；agent 替用户调 Cue 生产 API。 | v0.1.0 |
+| [`buddy/`](./buddy) — **cue-buddy** | 让业务专家通过自然对话起草、校验、测试、调优、设为常用 [Cue](https://cuecue.cn) 搭子（buddy）调研模板。不需要 Python / 不需要懂 API；agent 替用户调 Cue 生产 API。 | v0.1.0 |
 
 Cue surface 扩展会陆续在这里加新 skill。
 

@@ -10,7 +10,7 @@ A **skill** is a portable instruction bundle that any AI agent ([Claude Code](ht
 
 | Skill | Purpose | Status |
 |---|---|---|
-| [`buddy/`](./buddy) — **cue-buddy** | Lets business experts author, validate, test, tune, and publish [Cue](https://cuecue.cn) "buddy" research templates via natural conversation. No Python / API knowledge needed; the agent talks to the Cue production API on the user's behalf. | v0.1.0 |
+| [`buddy/`](./buddy) — **cue-buddy** | Lets business experts author, validate, test, tune, and pin-as-frequent [Cue](https://cuecue.cn) "buddy" research templates via natural conversation. No Python / API knowledge needed; the agent talks to the Cue production API on the user's behalf. | v0.1.0 |
 
 More skills will be added here as Cue's surface grows.
 

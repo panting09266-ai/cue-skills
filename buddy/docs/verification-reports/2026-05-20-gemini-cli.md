@@ -52,7 +52,7 @@ Two codex review rounds (r4 + r5) drove these fixes — all merged to `main` and
 
 ## Conclusion
 
-- **Skill works on Gemini CLI** for the in-scope verbs (`+author`, `+list`, `+capabilities`, `+validate`, `+create`, `+update`, `+publish` family).
+- **Skill works on Gemini CLI** for the in-scope verbs (`+author`, `+list`, `+capabilities`, `+validate`, `+create`, `+update`, `+frequent` family — referenced as `+publish` in the original 2026-05-20 run; see verb naming note at the top).
 - The single failure mode that surfaced (`+test` on long-running deep research) is now caught, diagnosed, and auto-recovered via replay without re-charging the user.
 - This is the kind of failure that **only shows up in real cross-agent verification** — synthetic tests with short mock backends never trigger it. The Gemini CLI run paid for itself by uncovering it.
 
