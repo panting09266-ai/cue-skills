@@ -44,7 +44,7 @@ Agent: [reads SKILL.md → triggers +author flow]
 
 ## Status
 
-**v0.1.0** — verified on Claude Code + Gemini CLI; should work on Codex CLI / OpenClaw via manual SKILL.md loading (not yet independently verified).
+**v0.1.0** — verified on Claude Code + Gemini CLI (see [`docs/verification-reports/2026-05-20-gemini-cli.md`](./docs/verification-reports/2026-05-20-gemini-cli.md) for the cross-agent run that drove the `+test` long-stream replay-fallback hardening); should work on Codex CLI / OpenClaw via manual SKILL.md loading (not yet independently verified).
 
 ## Who this is for
 
