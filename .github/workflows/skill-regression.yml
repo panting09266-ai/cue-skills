@@ -72,9 +72,22 @@ jobs:
           ec=$?
           set -e
           echo "$out"
-          # 期望非 0(因为没 API key),且包含 'API key' 提示
           test "$ec" -ne 0
           echo "$out" | grep -qi "API key"
+
+      - name: CLI smoke — cue_api.py replay subcommand known
+        # codex r5: test_template.py fallback hint 写 'cue_api.py replay <conv_id>'
+        # 之前 CLI 没 replay 子命令,user 跑出 unknown cmd。现已加。
+        # 无 conv_id 应 print usage + exit 2,不是 'unknown cmd'。
+        run: |
+          set +e
+          out=$(python3 buddy/scripts/cue_api.py replay 2>&1)
+          ec=$?
+          set -e
+          echo "$out"
+          # 期望 usage hint 不是 unknown cmd
+          echo "$out" | grep -q "usage: cue_api.py replay"
+          test "$ec" -eq 2
 
       - name: Validator self-check (sanity import + regex 5-family coverage)
         run: |

@@ -533,6 +533,7 @@ def main(argv: list[str] | None = None) -> int:
     t0 = time.time()
     events: list[tuple[str, str]] = []
     seen_reporter_end = False
+    stream_exc: Exception | None = None
     try:
         for event, data in chat_stream(payload, max_seconds=args.timeout):
             events.append((event, data))
@@ -548,9 +549,22 @@ def main(argv: list[str] | None = None) -> int:
                 sys.stderr.write("[+test] timeout watching SSE\n")
                 break
     except CueAPIError as e:
+        # 4xx/5xx 含 auth/template_id 问题 — 这类错误 replay 也救不了,直接报。
         sys.stderr.write(f"[+test] chat_stream failed: {e}\n")
         sys.stderr.write(f"        → {e.user_hint()}\n")
         return 1
+    except (OSError, ValueError) as e:
+        # codex r5 finding: 网络抖动 / SSE 解析炸 / socket timeout 等非 CueAPIError
+        # 之前 propagate 直接 return 1,绕过 replay fallback。现在记录异常,
+        # 让后续 diagnose+replay 仍有机会救场 — events 部分捕获就够诊断方向。
+        # OSError 涵盖 urllib.error.URLError, socket.timeout, ConnectionResetError 等;
+        # ValueError 涵盖 SSE 行解析炸的 case。
+        stream_exc = e
+        sys.stderr.write(
+            f"[+test] stream raised {type(e).__name__}: {e}\n"
+            f"        events captured before raise: {len(events)}; "
+            f"will try diagnose + replay fallback\n"
+        )
 
     elapsed = time.time() - t0
     print(f"[+test] stream done in {elapsed:.1f}s, events={len(events)}")

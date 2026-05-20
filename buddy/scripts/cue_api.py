@@ -754,6 +754,76 @@ def _cli() -> int:
             print(f"[update] updated template_id={template_id}")
             print(json.dumps(res, ensure_ascii=False, indent=2))
             return 0
+        if cmd == "replay":
+            # codex r5 finding: test_template.py fallback hint 写 'cue_api.py
+            # replay <conv_id>' 但本 CLI 没这个 subcommand,user 跑出 unknown cmd。
+            # 加 replay 子命令:重 emit conversation SSE 流到 stdout
+            # (无 credit cost, backend resume=0 default)。
+            #
+            # 用法:
+            #   cue_api.py replay <conversation_id>
+            #   cue_api.py replay <conversation_id> --timeout 600
+            #   cue_api.py replay <conversation_id> --report-only  # 只打 reporter 内容
+            if len(sys.argv) < 3:
+                print(
+                    "usage: cue_api.py replay <conversation_id> "
+                    "[--timeout <s>] [--report-only]"
+                )
+                return 2
+            conv_id = sys.argv[2]
+            rest = sys.argv[3:]
+            timeout = 600.0
+            report_only = False
+            i = 0
+            while i < len(rest):
+                arg = rest[i]
+                if arg == "--timeout" and i + 1 < len(rest):
+                    timeout = float(rest[i + 1])
+                    i += 2
+                elif arg == "--report-only":
+                    report_only = True
+                    i += 1
+                else:
+                    print(f"[replay] unknown arg: {arg!r}")
+                    return 2
+
+            in_reporter = False
+            report_pieces: list[str] = []
+            event_count = 0
+            for event, data in replay(conv_id, max_seconds=timeout):
+                event_count += 1
+                if report_only:
+                    try:
+                        payload = json.loads(data) if data else {}
+                    except json.JSONDecodeError:
+                        continue
+                    agent = (payload.get("data") or {}).get("agent_name", "")
+                    if event == "start_of_agent" and agent == "reporter":
+                        in_reporter = True
+                    elif event == "end_of_agent" and agent == "reporter":
+                        in_reporter = False
+                    elif in_reporter and event == "message":
+                        delta = (payload.get("data") or {}).get("delta") or {}
+                        text = delta.get("content") or ""
+                        if text:
+                            report_pieces.append(text)
+                else:
+                    print(f"event: {event}")
+                    print(f"data: {data}")
+                    print()
+            if report_only:
+                report = "".join(report_pieces)
+                if report:
+                    print(report)
+                else:
+                    sys.stderr.write(
+                        f"[replay] no reporter content captured "
+                        f"(events={event_count}); server-side may have failed\n"
+                    )
+                    return 1
+            else:
+                sys.stderr.write(f"[replay] {event_count} events read\n")
+            return 0
         print(f"unknown cmd: {cmd}")
         print(__doc__)
         return 2
