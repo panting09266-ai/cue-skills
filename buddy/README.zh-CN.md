@@ -47,7 +47,7 @@ Agent: [reads SKILL.md → triggers +author flow]
 
 ## 状态
 
-**v0.1.0** — Claude Code + Gemini CLI 已 verify(详见 [`docs/verification-reports/2026-05-20-gemini-cli.md`](./docs/verification-reports/2026-05-20-gemini-cli.md),那次 cross-agent 跑出来的 +test 长流断点正是驱动 replay fallback 加固的真实案例);Codex CLI / OpenClaw 通过手动 load SKILL.md 应可工作(未独立 verify)。
+**v0.1.0** — Claude Code + Gemini CLI + Codex CLI 已 verify(详见 [`docs/verification-reports/2026-05-20-gemini-cli.md`](./docs/verification-reports/2026-05-20-gemini-cli.md),那次 Gemini CLI cross-agent 跑出来的 +test 长流断点正是驱动 replay fallback 加固的真实案例);OpenClaw 通过手动 load SKILL.md 应可工作(未独立 verify)。
 
 ## 适合谁用
 
