@@ -1,0 +1,146 @@
+# cue-buddy
+
+> An AI-agent skill that lets business experts author, validate, test, and publish [Cue](https://cuecue.cn) "buddy" templates — without writing code.
+
+## What is Cue / What is a buddy
+
+[Cue](https://cuecue.cn) is a **Deep Research Agent + Intelligence Sentinel** platform built for high-precision finance and business workflows. Cue picks the right tools from **300+ professional data sources** — A-share / HK / US equity disclosures, fund AMAC registries, business registries, court records, regulatory feeds, sell-side research, capital flow data — cross-validates findings across sources, and produces structured, **source-cited** reports in minutes instead of hours. Every conclusion links back to its origin; nothing is fabricated.
+
+A **"buddy" (搭子)** is your personal research companion in Cue. You define a scenario once — corporate-credit pre-diligence, KYC screening, quarterly earnings review, wealth-management peer comparison, private-fund manager due diligence, etc. — and Cue **solidifies the research playbook** (what to fetch, how to cross-validate, what report shape to produce) into a reusable template. From then on you just supply the subject (entity name, focus topic) and the buddy runs the playbook end-to-end. Cue's product premise is *"turn satisfying research experiences into your AI companions"* (把满意经历沉淀成你身边的 AI 伙伴) — buddy templates are how that solidification happens.
+
+## What this skill is
+
+`cue-buddy` is a [skill](https://docs.anthropic.com/en/docs/agents-and-tools/agent-skills) that plugs into any AI agent (Claude Code, Codex CLI, Gemini CLI, OpenClaw, etc.) and turns natural conversation into Cue template authoring. Business experts (no Python, no API knowledge) talk to their agent in domain language; the agent drafts, validates, creates, tests, tunes, and publishes the template via the Cue production API.
+
+A buddy template is just **4 LLM-consumed fields**:
+- **`input_form_spec`** — what inputs the user supplies (with a default fallback)
+- **`goal`** — the buddy's role, user pain point, and value proposition
+- **`search_plan`** — research strategy clustered by data source
+- **`report_format`** — the report skeleton (sections + per-section execution blueprints)
+
+Once published, the buddy shows up on the user's cuecue.cn workbench and can run real research tasks (typically 5–15 credits per run; exact cost shown in the workbench).
+
+This skill makes the authoring loop self-serve for business users:
+
+```
+User: "我想做一个针对医院科主任的医患沟通预判搭子"
+Agent: [reads SKILL.md → triggers +author flow]
+       → asks 4 groups of business questions
+       → drafts the 4 fields via LLM
+       → runs +validate against 7 hard rules
+       → on confirmation, POSTs to user's template library
+       → optionally runs +test on a real case
+       → on confirmation, +publish to workbench home
+```
+
+## Status
+
+**v0.1.0** — verified on Claude Code; should work on Codex CLI / Gemini CLI / OpenClaw via manual SKILL.md loading (not yet independently verified).
+
+## Who this is for
+
+- **Domain experts**: finance, consulting, compliance, medical, legal, research
+- Knows their scenario deeply but does not write Python and does not read API specs
+- Has a Cue account (sign up at [cuecue.cn](https://cuecue.cn))
+- Has an API key (create one at [cuecue.cn/api-key](https://cuecue.cn/api-key))
+
+If you are a developer integrating Cue into a custom application, use the [Cue API docs](https://cuecue.cn) directly. This skill is opinionated for non-technical authoring.
+
+## Quickstart
+
+### 1. Install the skill in your agent
+
+Clone this repo (or download the directory) and tell your agent to load it.
+
+- **Claude Code**: place the directory under a configured skills path, or invoke `/skill cue-buddy` if your CLI version supports it
+- **Codex CLI**: load the SKILL.md manually with `cat <path>/SKILL.md` and ask the agent to apply
+- **Gemini CLI**: use `activate_skill` with the SKILL.md path
+- **OpenClaw / others**: follow the agent's skill loading convention
+
+### 2. Configure your API key (one-time)
+
+Create a key at [https://cuecue.cn/api-key](https://cuecue.cn/api-key), then set it as an environment variable:
+
+```bash
+export CUE_API_KEY=sk...
+```
+
+Or write to `~/.cue/config.json`:
+
+```json
+{ "api_key": "sk...", "base": "https://cuecue.cn/api" }
+```
+
+Verify it works:
+
+```bash
+python3 scripts/cue_api.py whoami
+```
+
+### 3. Try it out
+
+In your agent, just say what you want:
+
+```
+"我想做一个反洗钱合规筛查搭子"
+"design a buddy for earnings-call quick reviews"
+"基于这份样例报告 ./report.pdf 做一个尽调搭子"
+"测一下我刚才那个搭子，主体用万科"
+```
+
+The agent reads SKILL.md and dispatches the right verb (`+author`, `+test`, `+tune`, `+publish`, etc.).
+
+## What you can do
+
+| Verb | Description | Costs credits? |
+|---|---|---|
+| `+author` | Guided question-and-answer flow that drafts the 4 fields | No |
+| `+validate` | Lint a template JSON against 7 hard rules, offline | No |
+| `+create` | POST a validated template to your library | No |
+| `+list` | List your templates | No |
+| `+get` | Fetch one full template | No |
+| `+update` | Modify an existing template | No |
+| `+test` | Run a real research conversation, capture report, run 8 checks | **Yes** (~5–15) |
+| `+tune` | Let LLM revise the template based on your issue notes; diff preview + auto-backup before PUT | **Yes** (~2–6) |
+| `+publish` | Pin the template to your workbench home (`is_frequent=true`) | No |
+| `+unpublish` | Unpin from workbench home | No |
+
+## Privacy
+
+Reference materials you provide (sample reports, internal SOPs, monitor pages) **stay on your machine**. The skill extracts structure (chapter outline, source clusters, tone) for drafting but never uploads your originals to Cue.
+
+See [`references/materials-intake.md`](references/materials-intake.md) for the detailed rules the agent follows when consuming your local files.
+
+## Repo layout
+
+```
+buddy/
+├── SKILL.md                   # Skill spec read by the calling agent
+├── scripts/
+│   ├── cue_api.py             # Stdlib-only HTTP client (no deps)
+│   ├── validate_template.py   # Offline 7-rule validator
+│   ├── test_template.py       # Run real conversation + 8 parametric checks
+│   └── tune_template.py       # Generate-revise + diff + confirm + backup + PUT
+└── references/
+    ├── template-fields-spec.md     # 4-field detailed format guide
+    ├── hard-rules.md               # Validator rules R1-R8 with rationale
+    ├── materials-intake.md         # How agent consumes user-provided local files
+    └── examples/
+        └── corporate-credit.md     # Full sample template (verified working)
+```
+
+## Dependencies
+
+- Python 3.10+ (stdlib only — no `pip install` needed)
+- An AI agent that supports skills
+
+## License
+
+[MIT](LICENSE)
+
+## Contributing
+
+Issues and PRs welcome. Especially valuable:
+- New `references/examples/<scenario>.md` covering domain templates (KYC, earnings-review, market-research, due-diligence, healthcare etc.)
+- Cross-agent verification reports (Codex / Gemini / OpenClaw)
+- Hard-rule additions backed by failure-mode evidence
