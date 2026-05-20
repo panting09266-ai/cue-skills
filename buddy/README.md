@@ -1,12 +1,14 @@
 # cue-buddy
 
+**[English](README.md) · [中文](README.zh-CN.md)**
+
 > An AI-agent skill that lets business experts author, validate, test, and publish [Cue](https://cuecue.cn) "buddy" templates — without writing code.
 
 ## What is Cue / What is a buddy
 
 [Cue](https://cuecue.cn) is a **Deep Research Agent + Intelligence Sentinel** platform built for high-precision finance and business workflows. Cue picks the right tools from **300+ professional data sources** — A-share / HK / US equity disclosures, fund AMAC registries, business registries, court records, regulatory feeds, sell-side research, capital flow data — cross-validates findings across sources, and produces structured, **source-cited** reports in minutes instead of hours. Every conclusion links back to its origin; nothing is fabricated.
 
-A **"buddy" (搭子)** is your personal research companion in Cue. You define a scenario once — corporate-credit pre-diligence, KYC screening, quarterly earnings review, wealth-management peer comparison, private-fund manager due diligence, etc. — and Cue **solidifies the research playbook** (what to fetch, how to cross-validate, what report shape to produce) into a reusable template. From then on you just supply the subject (entity name, focus topic) and the buddy runs the playbook end-to-end. Cue's product premise is *"turn satisfying research experiences into your AI companions"* (把满意经历沉淀成你身边的 AI 伙伴) — buddy templates are how that solidification happens.
+A **"buddy" (搭子)** is your personal research companion in Cue. You define a scenario once — corporate-credit pre-diligence, public-record compliance snapshot, quarterly earnings review, wealth-management peer comparison, private-fund manager due diligence, etc. — and Cue **solidifies the research playbook** (what to fetch, how to cross-validate, what report shape to produce) into a reusable template. From then on you just supply the subject (entity name, focus topic) and the buddy runs the playbook end-to-end. Cue's product premise is *"turn satisfying research experiences into your AI companions"* (把满意经历沉淀成你身边的 AI 伙伴) — buddy templates are how that solidification happens.
 
 ## What this skill is
 
@@ -23,10 +25,17 @@ Once published, the buddy shows up on the user's cuecue.cn workbench and can run
 This skill makes the authoring loop self-serve for business users:
 
 ```
-User: "我想做一个针对医院科主任的医患沟通预判搭子"
+User: "我想做一个针对城商行客户经理的对公授信预尽调搭子"
 Agent: [reads SKILL.md → triggers +author flow]
        → asks 4 groups of business questions
-       → drafts the 4 fields via LLM
+       → calls GET /api/tools/capabilities to inventory current Cue
+         researcher surface (~391 tools / ~56 categories / 10 presets)
+       → drafts the 4 fields via LLM, aligned to supported capability
+         domains (category = supervisor routing label)
+       → cross-checks each search_plan dimension against capabilities
+         API; warns user if any declared evidence source has no
+         backing category (e.g. industry associations have no
+         dedicated tool — falls back to web_search)
        → runs +validate against 7 hard rules
        → on confirmation, POSTs to user's template library
        → optionally runs +test on a real case
@@ -39,7 +48,7 @@ Agent: [reads SKILL.md → triggers +author flow]
 
 ## Who this is for
 
-- **Domain experts**: finance, consulting, compliance, medical, legal, research
+- **Domain experts**: finance / banking credit / asset management / private fund DD / regulatory compliance / corporate-strategy research / industry analyst
 - Knows their scenario deeply but does not write Python and does not read API specs
 - Has a Cue account (sign up at [cuecue.cn](https://cuecue.cn))
 - Has an API key (create one at [cuecue.cn/api-key](https://cuecue.cn/api-key))
@@ -82,7 +91,7 @@ python3 scripts/cue_api.py whoami
 In your agent, just say what you want:
 
 ```
-"我想做一个反洗钱合规筛查搭子"
+"我想做一个高风险主体公开合规快照搭子"
 "design a buddy for earnings-call quick reviews"
 "基于这份样例报告 ./report.pdf 做一个尽调搭子"
 "测一下我刚才那个搭子，主体用万科"
@@ -94,7 +103,8 @@ The agent reads SKILL.md and dispatches the right verb (`+author`, `+test`, `+tu
 
 | Verb | Description | Costs credits? |
 |---|---|---|
-| `+author` | Guided question-and-answer flow that drafts the 4 fields | No |
+| `+author` | Guided Q&A drafting the 4 fields; calls `+capabilities` to align with Cue's actual tool surface and warns on uncovered evidence sources | No |
+| `+capabilities` | List Cue researcher surface (~391 tools / ~56 categories / 10 presets); supports `q=<term>` / `category=<label>` probes; ETag-cached | No |
 | `+validate` | Lint a template JSON against 7 hard rules, offline | No |
 | `+create` | POST a validated template to your library | No |
 | `+list` | List your templates | No |
@@ -141,6 +151,6 @@ buddy/
 ## Contributing
 
 Issues and PRs welcome. Especially valuable:
-- New `references/examples/<scenario>.md` covering domain templates (KYC, earnings-review, market-research, due-diligence, healthcare etc.)
+- New `references/examples/<scenario>.md` covering domain templates (earnings-review, private-fund DD, public-record compliance snapshot, gov-procurement lead scan, policy-watch, sector-tracking, etc.) — scope should align with Cue's actual tool surface (finance / 工商 / 司法 / 监管 / 资金流 / 行业研报 / 政府采购),avoid scenarios requiring private data (e.g. real AML on bank-internal transactions, medical diagnosis)
 - Cross-agent verification reports (Codex / Gemini / OpenClaw)
 - Hard-rule additions backed by failure-mode evidence

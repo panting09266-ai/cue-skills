@@ -1,5 +1,7 @@
 # cue-skills
 
+**[English](README.md) · [中文](README.zh-CN.md)**
+
 Open-source agent skills published by [Cue](https://cuecue.cn) (sensedeal).
 
 A **skill** is a portable instruction bundle that any AI agent ([Claude Code](https://docs.anthropic.com/en/docs/agents-and-tools/agent-skills), Codex CLI, Gemini CLI, …) can load to gain a new capability — without modifying the agent itself. This repo collects the skills Cue maintains for public use.
@@ -16,7 +18,9 @@ More skills will be added here as Cue's surface grows.
 
 [Cue](https://cuecue.cn) is a **Deep Research Agent + Intelligence Sentinel** platform for high-precision finance and business workflows. It picks tools from 300+ professional data sources (A-share / HK / US equity disclosures, fund AMAC registries, business registries, court records, regulatory feeds, sell-side research, capital flow data), cross-validates findings across sources, and produces structured, source-cited reports in minutes instead of hours.
 
-A **"buddy" (搭子)** is a research playbook for a specific scenario — corporate-credit pre-diligence, KYC screening, quarterly earnings review, etc. — defined once and reused by supplying the subject. The `cue-buddy` skill in this repo is what business experts use to author these playbooks conversationally.
+A **"buddy" (搭子)** is a research playbook for a specific scenario — corporate-credit pre-diligence, public-record compliance snapshot, quarterly earnings review, private-fund manager DD, etc. — defined once and reused by supplying the subject. The `cue-buddy` skill in this repo is what business experts use to author these playbooks conversationally.
+
+> **Scope boundary**: Cue's tool surface covers public data sources only (equity disclosures / business registries / court records / regulatory filings / capital flows / etc.). Scenarios requiring private data (real AML on bank-internal transactions, medical diagnosis, internal accounting) are **not appropriate** as Cue buddies — the supervisor cannot route them and falls back to generic web search. `cue-buddy +author` flow calls `+capabilities` to cross-check each declared evidence source against the actual catalog before persisting a template.
 
 See [`buddy/README.md`](./buddy/README.md) for the full skill walkthrough.
 
