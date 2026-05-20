@@ -354,6 +354,86 @@ class Case9_CronExpressionsTypoRejected(unittest.TestCase):
         self.assertIn("type", str(cm.exception))
 
 
+class Case10_TestTemplateDiagnosis(unittest.TestCase):
+    """codex r4 finding — test_template.py _diagnose_empty_report 分类正确性.
+
+    +test SSE 长流断连场景的诊断函数,决定要不要走 replay fallback。
+    """
+
+    def test_stream_cut_before_reporter(self) -> None:
+        """events 只有 coordinator/researcher,reporter 还没 start 就断流。"""
+        import json
+
+        from test_template import _diagnose_empty_report
+
+        events = [
+            ("start_of_agent", json.dumps({"data": {"agent_name": "coordinator"}})),
+            ("message", json.dumps({"data": {"delta": {"content": "x"}}})),
+            ("end_of_agent", json.dumps({"data": {"agent_name": "coordinator"}})),
+            ("start_of_agent", json.dumps({"data": {"agent_name": "researcher"}})),
+            ("message", json.dumps({"data": {"delta": {"content": "y"}}})),
+        ]
+        d = _diagnose_empty_report(events, elapsed=372.9, timeout=300.0)
+        self.assertEqual(d["kind"], "stream_cut_before_reporter")
+        self.assertEqual(d["last_agent"], "researcher")
+        self.assertFalse(d["reporter_started"])
+        self.assertTrue(d["hit_timeout"])
+
+    def test_no_agent_events(self) -> None:
+        """events 完全无 agent — auth/template_id 错或后端没响应。"""
+        import json
+
+        from test_template import _diagnose_empty_report
+
+        events = [
+            ("message", json.dumps({"data": {"delta": {"content": "noise"}}})),
+        ]
+        d = _diagnose_empty_report(events, elapsed=2.0, timeout=300.0)
+        self.assertEqual(d["kind"], "no_agent_events")
+        self.assertIsNone(d["last_agent"])
+        self.assertFalse(d["hit_timeout"])
+
+    def test_reporter_started_no_text(self) -> None:
+        """reporter start 看到了但没 message text — 罕见 server-side fail。"""
+        import json
+
+        from test_template import _diagnose_empty_report
+
+        events = [
+            ("start_of_agent", json.dumps({"data": {"agent_name": "reporter"}})),
+            # 没 message events,直接 end
+            ("end_of_agent", json.dumps({"data": {"agent_name": "reporter"}})),
+        ]
+        d = _diagnose_empty_report(events, elapsed=10.0, timeout=300.0)
+        self.assertEqual(d["kind"], "reporter_started_no_text")
+        self.assertTrue(d["reporter_started"])
+        self.assertTrue(d["reporter_ended"])
+
+    def test_extractor_works_without_end_marker(self) -> None:
+        """codex r4 关键纠错:end_of_agent 缺失**不会**让 extractor 空 —
+        in_reporter 保持 True 直到流结束,后续 message 仍累加。"""
+        import json
+
+        from test_template import _extract_reporter_content
+
+        events = [
+            ("start_of_agent", json.dumps({"data": {"agent_name": "reporter"}})),
+            (
+                "message",
+                json.dumps({"data": {"delta": {"content": "## 1. 业绩\n"}}}),
+            ),
+            (
+                "message",
+                json.dumps({"data": {"delta": {"content": "营收增长 20%\n"}}}),
+            ),
+            # 没 end_of_agent — 流断在 reporter 中间
+        ]
+        report = _extract_reporter_content(events)
+        # ✓ 即使 end 没到,extractor 仍累加,report 非空
+        self.assertIn("业绩", report)
+        self.assertIn("营收增长 20%", report)
+
+
 if __name__ == "__main__":
     # Unbuffered + verbose for skill author workflow.
     unittest.main(verbosity=2)

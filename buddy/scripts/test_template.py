@@ -40,6 +40,7 @@ from cue_api import (  # noqa: E402
     chat_stream,
     get_template,
     load_config,
+    replay,
 )
 from validate_template import (  # noqa: E402
     FORBIDDEN_VERDICT_PHRASES,
@@ -83,6 +84,64 @@ def _extract_reporter_content(events: list[tuple[str, str]]) -> str:
 
 def _agent_name(payload: dict) -> str:
     return (payload.get("data") or {}).get("agent_name", "")
+
+
+def _diagnose_empty_report(
+    events: list[tuple[str, str]],
+    elapsed: float,
+    timeout: float,
+) -> dict:
+    """Classify why `_extract_reporter_content` returned empty.
+
+    Returns dict with keys:
+      - kind: 'stream_cut_before_reporter' | 'reporter_started_no_text'
+              | 'no_agent_events' | 'unknown'
+      - last_agent: last `start_of_agent` agent_name seen, or None
+      - reporter_started: bool
+      - reporter_ended: bool
+      - message_event_count: int
+      - hit_timeout: bool (elapsed >= timeout - epsilon)
+    """
+    last_agent: str | None = None
+    reporter_started = False
+    reporter_ended = False
+    message_count = 0
+    for event, data in events:
+        if not data:
+            continue
+        try:
+            payload = json.loads(data)
+        except json.JSONDecodeError:
+            continue
+        if event == "start_of_agent":
+            ag = _agent_name(payload)
+            if ag:
+                last_agent = ag
+            if ag == "reporter":
+                reporter_started = True
+        elif event == "end_of_agent" and _agent_name(payload) == "reporter":
+            reporter_ended = True
+        elif event == "message":
+            message_count += 1
+
+    hit_timeout = elapsed >= (timeout - 5.0)
+
+    if not last_agent:
+        kind = "no_agent_events"
+    elif not reporter_started:
+        kind = "stream_cut_before_reporter"
+    else:
+        # reporter started but no text accumulated — rare server-side case
+        kind = "reporter_started_no_text"
+
+    return {
+        "kind": kind,
+        "last_agent": last_agent,
+        "reporter_started": reporter_started,
+        "reporter_ended": reporter_ended,
+        "message_event_count": message_count,
+        "hit_timeout": hit_timeout,
+    }
 
 
 def _extract_tool_calls(events: list[tuple[str, str]]) -> list[dict]:
@@ -499,9 +558,61 @@ def main(argv: list[str] | None = None) -> int:
         print("[+test] WARNING: did not observe reporter end_of_agent — report may be partial")
 
     report = _extract_reporter_content(events)
+
+    # L1 诊断分流 + L2 replay fallback (codex r4 finding):
+    # +test stream 经常因长跑 (>5min deep research) / 网络抖动 / client timeout
+    # 在 reporter agent 启动**之前**断连。server 仍跑完写 DB,但 client events
+    # 拿不到 reporter 段,_extract 空 return。`GET /api/replay/<conv>?resume=0`
+    # 是无 credit 的 DB-replay,可在断连后重拉完整 events 流。
     if not report:
-        sys.stderr.write("[+test] no reporter content captured — check workflow_id / template_id\n")
-        return 1
+        diag = _diagnose_empty_report(events, elapsed, args.timeout)
+        print(
+            f"[+test] empty report detected → diagnosis: kind={diag['kind']}, "
+            f"last_agent={diag['last_agent']!r}, reporter_started={diag['reporter_started']}, "
+            f"messages={diag['message_event_count']}, hit_timeout={diag['hit_timeout']}"
+        )
+        if diag["kind"] == "stream_cut_before_reporter":
+            print(
+                f"[+test] stream disconnected before reporter started "
+                f"(last agent: {diag['last_agent']!r}). "
+                f"Retrying via /api/replay/{conv_id}?resume=0 (no credit cost)…"
+            )
+            replay_events: list[tuple[str, str]] = []
+            try:
+                for event, data in replay(conv_id, max_seconds=args.timeout):
+                    replay_events.append((event, data))
+            except CueAPIError as e:
+                sys.stderr.write(
+                    f"[+test] replay failed: {e}\n"
+                    f"        → server may not have finished yet; wait a few seconds "
+                    f"and run: cue_api.py replay {conv_id}\n"
+                )
+                return 1
+            report = _extract_reporter_content(replay_events)
+            if report:
+                print(
+                    f"[+test] ✓ recovered via replay: events={len(replay_events)}, "
+                    f"report={len(report)} chars"
+                )
+                events = replay_events  # so subsequent _render_run_md / tool_calls reflect full stream
+            else:
+                sys.stderr.write(
+                    "[+test] replay also produced empty report — server-side reporter "
+                    "may have failed. Check cuecue.cn web for this conversation_id.\n"
+                )
+                return 1
+        elif diag["kind"] == "no_agent_events":
+            sys.stderr.write(
+                "[+test] no agent events received — likely API auth / workflow_id / "
+                "template_id problem (not a long-stream issue). Check args + key.\n"
+            )
+            return 1
+        else:  # reporter_started_no_text
+            sys.stderr.write(
+                "[+test] reporter started but emitted no text content. "
+                "Server-side reporter agent likely failed; check cuecue.cn web replay.\n"
+            )
+            return 1
 
     checks = run_checks(template, args.entity, report)
     passed = sum(1 for c in checks if c.ok)
