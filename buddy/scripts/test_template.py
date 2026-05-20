@@ -259,11 +259,34 @@ SECTION_HEADING = re.compile(r"(?m)^##\s*(\d+)[.、]\s*(.+?)\s*$")
 TOOL_NAME_PATTERN = TOOL_NAME_LEAK_RE
 
 
+def _compact_entity_text(s: str) -> str:
+    return re.sub(r"[\s（）()【】\\[\\]·,，。:：/\\-]+", "", s)
+
+
+def _is_ordered_subsequence(needle: str, haystack: str) -> bool:
+    if not needle:
+        return False
+    it = iter(haystack)
+    return all(ch in it for ch in needle)
+
+
 def _check_title_contains_entity(report: str, entity: str) -> CheckResult:
     first_line = next((ln for ln in report.splitlines() if ln.startswith("#")), "")
+    entity_compact = _compact_entity_text(entity)
+    heading_compact = _compact_entity_text(first_line)
+    exact_or_normalized = entity in first_line or entity_compact in heading_compact
+    # Cue often normalizes a short input such as "淡水泉投资" to the legal
+    # name "淡水泉（北京）投资管理有限公司". Accept ordered character coverage
+    # for Chinese short names so the check validates subject resolution
+    # instead of requiring a brittle literal substring.
+    legal_name_expanded = (
+        len(entity_compact) >= 4
+        and re.fullmatch(r"[一-鿿]+", entity_compact) is not None
+        and _is_ordered_subsequence(entity_compact, heading_compact)
+    )
     return CheckResult(
         name="标题含主体名",
-        ok=entity in first_line,
+        ok=exact_or_normalized or legal_name_expanded,
         detail=f"first heading: {first_line[:80] or '(missing)'}",
     )
 

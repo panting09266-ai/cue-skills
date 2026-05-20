@@ -460,6 +460,17 @@ class Case10_TestTemplateDiagnosis(unittest.TestCase):
         self.assertIn("营收增长 20%", report)
 
 
+class Case11_TestTemplateChecks(unittest.TestCase):
+    """+test report checks should accept legal-name expansion."""
+
+    def test_title_check_accepts_short_name_expanded_to_legal_name(self) -> None:
+        from test_template import _check_title_contains_entity
+
+        report = "# 淡水泉（北京）投资管理有限公司 私募管理人公开尽调底稿\n"
+        result = _check_title_contains_entity(report, "淡水泉投资")
+        self.assertTrue(result.ok, result.detail)
+
+
 if __name__ == "__main__":
     # Unbuffered + verbose for skill author workflow.
     unittest.main(verbosity=2)
