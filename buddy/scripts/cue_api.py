@@ -66,6 +66,16 @@ class CueAPIError(Exception):
         Used by the agent / CLI to translate raw API errors into
         next-step guidance for the business user.
         """
+        if self.status == 0:
+            # codex r6: transport-layer failure (URLError → no HTTP response).
+            # 区分 sandbox/proxy/offline 三个常见原因给方向。
+            return (
+                "网络不可达 — 无法连到 Cue API。请检查:\n"
+                "    1) CUE_API_BASE 拼写 (默认 https://cuecue.cn/api)\n"
+                "    2) 网络/VPN/代理设置 (HTTP_PROXY/HTTPS_PROXY env)\n"
+                "    3) agent sandbox 是否禁用了出站 (常见于 Codex/Gemini\n"
+                "       受限 mode);用 --sandbox danger-full-access 等开放设置"
+            )
         if self.status == 401:
             return (
                 "API key 无效或已过期。"
@@ -156,7 +166,7 @@ def _request(
     try:
         resp = urllib.request.urlopen(req, timeout=timeout)
     except urllib.error.HTTPError as e:
-        # Decode body for a useful error
+        # 4xx/5xx — server replied with HTTP error. Decode body for actionable detail.
         try:
             err_body = e.read().decode("utf-8", errors="replace")
             try:
@@ -171,6 +181,16 @@ def _request(
         except Exception:
             detail = "(no body)"
         raise CueAPIError(e.code, detail, path) from e
+    except urllib.error.URLError as e:
+        # codex r6 finding: connection refused / DNS fail / sandbox-blocked /
+        # offline / TLS error 这种 transport-layer 失败之前 propagate 出
+        # CueAPIError 范围,CLI 外层 except 兜不住,user 看到 raw traceback。
+        # 包装成 CueAPIError(status=0) 表示"无 HTTP response"。user_hint()
+        # 有专门 status=0 分支给 actionable 提示(检查网络 / proxy / base URL)。
+        reason = getattr(e, "reason", e)
+        raise CueAPIError(
+            0, f"network unreachable: {reason}", path
+        ) from e
 
     if stream:
         return resp
@@ -829,6 +849,9 @@ def _cli() -> int:
         return 2
     except CueAPIError as e:
         sys.stderr.write(f"[error] {e}\n")
+        hint = e.user_hint()
+        if hint:
+            sys.stderr.write(f"        → {hint}\n")
         return 1
 
 

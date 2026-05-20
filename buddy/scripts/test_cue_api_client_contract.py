@@ -251,6 +251,27 @@ class Case4_ErrorPropagation(unittest.TestCase):
         # detail should include the structured payload (json-serialized when dict)
         self.assertIn("unsupported_fields", cm.exception.detail)
 
+    def test_network_unreachable_wrapped_as_cue_api_error(self) -> None:
+        """codex r6: URLError(transport-layer fail) 必须包装成 CueAPIError(status=0),
+        否则 CLI 外层 except 兜不住 → user 看到 raw Python traceback。"""
+        # 临时切到不可连的 base URL,再调一次 capabilities
+        import urllib.request
+
+        orig_base = os.environ.get("CUE_API_BASE")
+        os.environ["CUE_API_BASE"] = "http://127.0.0.1:1"  # nothing listens
+        try:
+            with self.assertRaises(CueAPIError) as cm:
+                capabilities()
+            self.assertEqual(cm.exception.status, 0)
+            self.assertIn("network unreachable", cm.exception.detail)
+            # user_hint 给 actionable 提示而非 raw error
+            hint = cm.exception.user_hint()
+            self.assertIn("CUE_API_BASE", hint)
+            self.assertIn("代理", hint)
+        finally:
+            if orig_base is not None:
+                os.environ["CUE_API_BASE"] = orig_base
+
 
 class Case5_NoRegressionOnRetry(unittest.TestCase):
     def test_calls_remain_idempotent(self) -> None:
