@@ -2,7 +2,7 @@
 
 **[English](README.md) · [中文](README.zh-CN.md)**
 
-> 一个 AI agent skill,让业务专家通过对话起草、校验、测试、发布 [Cue](https://cuecue.cn) "搭子"调研模板——**不用写一行代码**。
+> 一个 AI agent skill,让业务专家通过对话起草、校验、测试、设为常用 [Cue](https://cuecue.cn) "搭子"调研模板——**不用写一行代码**。
 
 ## Cue 是什么 / 搭子是什么
 
@@ -12,7 +12,7 @@
 
 ## 本 skill 做什么
 
-`cue-buddy` 是一个能装进任意 AI agent(Claude Code / Codex CLI / Gemini CLI / OpenClaw 等)的 [skill](https://docs.anthropic.com/en/docs/agents-and-tools/agent-skills),把"对话"转化成 Cue 模板的起草动作。业务专家(不写 Python、不读 API spec)用业务语言跟 agent 说话;agent 起草、校验、创建、测试、调优、发布,全程走 Cue 生产 API。
+`cue-buddy` 是一个能装进任意 AI agent(Claude Code / Codex CLI / Gemini CLI / OpenClaw 等)的 [skill](https://docs.anthropic.com/en/docs/agents-and-tools/agent-skills),把"对话"转化成 Cue 模板的起草动作。业务专家(不写 Python、不读 API spec)用业务语言跟 agent 说话;agent 起草、校验、创建、测试、调优、并设为常用(钉到工作台首页"常用"区),全程走 Cue 生产 API。
 
 一个搭子模板由 **4 个 LLM-consumed 字段**组成:
 
@@ -21,7 +21,7 @@
 - **`search_plan`** — 调研策略(按数据源聚类)
 - **`report_format`** — 报告骨架(章节 + 每章执行蓝图)
 
-发布后,搭子出现在用户的 cuecue.cn 工作台,可跑真实调研任务(典型 5–15 credits/次,确切费用见工作台)。
+创建后,搭子进入用户的 cuecue.cn 个人模板库,可跑真实调研任务(典型 5–15 credits/次,确切费用见工作台);**设为常用**后会钉到工作台首页"常用"区方便快速调用。
 
 本 skill 把 author loop 做成业务用户能自助跑:
 

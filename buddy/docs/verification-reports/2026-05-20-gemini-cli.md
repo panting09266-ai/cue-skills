@@ -1,5 +1,12 @@
 # Gemini CLI cross-agent verification — 2026-05-20
 
+> **Verb naming note (added 2026-05-21)**: this report references `+publish` /
+> `+unpublish` because that was the verb name in effect during the 2026-05-20
+> run. On 2026-05-21 these verbs were **renamed to `+frequent` / `+unfrequent`**
+> to better reflect their actual semantics ("设为常用" — pin to the caller's own
+> workbench, **not** cross-user publishing). API endpoint + payload unchanged.
+> The report below preserves the original terminology for historical accuracy.
+
 **Status**: ✅ verified (with long-stream robustness gap surfaced + fixed)
 **Skill**: cue-buddy v0.1.0
 **Agent**: Gemini CLI
