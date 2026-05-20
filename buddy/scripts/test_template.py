@@ -75,7 +75,7 @@ def _extract_reporter_content(events: list[tuple[str, str]]) -> str:
             in_reporter = False
             continue
         if in_reporter and event == "message":
-            delta = (payload.get("data") or {}).get("delta") or {}
+            delta = _event_data(payload).get("delta") or {}
             text = delta.get("content") or ""
             if text:
                 pieces.append(text)
@@ -83,7 +83,16 @@ def _extract_reporter_content(events: list[tuple[str, str]]) -> str:
 
 
 def _agent_name(payload: dict) -> str:
-    return (payload.get("data") or {}).get("agent_name", "")
+    # Live SSE/replay payloads may encode agent_name either at the event
+    # root (`{"agent_name": ...}`) or nested under `data` depending on
+    # route/version. Support both so diagnostics and report extraction do
+    # not misclassify valid streams as "no agent events".
+    return payload.get("agent_name") or (payload.get("data") or {}).get("agent_name", "")
+
+
+def _event_data(payload: dict) -> dict:
+    nested = payload.get("data")
+    return nested if isinstance(nested, dict) else payload
 
 
 def _diagnose_empty_report(
@@ -161,9 +170,9 @@ def _extract_tool_calls(events: list[tuple[str, str]]) -> list[dict]:
             payload = json.loads(data)
         except json.JSONDecodeError:
             continue
-        d = payload.get("data") or {}
+        d = _event_data(payload)
         if event == "start_of_agent":
-            current_agent = d.get("agent_name", "")
+            current_agent = _agent_name(payload)
         if event == "tool_call":
             tid = d.get("tool_call_id") or f"_anon_{len(order)}"
             inp = d.get("tool_input") or d.get("tool_plain_input") or {}
@@ -193,7 +202,7 @@ def _extract_agent_timeline(events: list[tuple[str, str]]) -> list[dict]:
             payload = json.loads(data)
         except json.JSONDecodeError:
             continue
-        d = payload.get("data") or {}
+        d = _event_data(payload)
         timeline.append(
             {
                 "agent": d.get("agent_name", "?"),

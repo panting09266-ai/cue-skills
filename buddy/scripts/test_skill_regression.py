@@ -379,6 +379,32 @@ class Case10_TestTemplateDiagnosis(unittest.TestCase):
         self.assertFalse(d["reporter_started"])
         self.assertTrue(d["hit_timeout"])
 
+    def test_top_level_agent_name_events_are_supported(self) -> None:
+        """Replay SSE uses top-level agent_name; extractor must support it."""
+        import json
+
+        from test_template import _diagnose_empty_report, _extract_reporter_content
+
+        events = [
+            ("start_of_agent", json.dumps({"agent_name": "reporter"})),
+            (
+                "message",
+                json.dumps(
+                    {
+                        "agent_name": "reporter",
+                        "delta": {"content": "# 淡水泉 尽调报告\n"},
+                    }
+                ),
+            ),
+            ("end_of_agent", json.dumps({"agent_name": "reporter"})),
+        ]
+        report = _extract_reporter_content(events)
+        self.assertIn("淡水泉", report)
+
+        d = _diagnose_empty_report(events, elapsed=1.0, timeout=300.0)
+        self.assertTrue(d["reporter_started"])
+        self.assertTrue(d["reporter_ended"])
+
     def test_no_agent_events(self) -> None:
         """events 完全无 agent — auth/template_id 错或后端没响应。"""
         import json

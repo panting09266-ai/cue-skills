@@ -824,13 +824,14 @@ def _cli() -> int:
                         payload = json.loads(data) if data else {}
                     except json.JSONDecodeError:
                         continue
-                    agent = (payload.get("data") or {}).get("agent_name", "")
+                    event_data = payload.get("data") if isinstance(payload.get("data"), dict) else payload
+                    agent = payload.get("agent_name") or event_data.get("agent_name", "")
                     if event == "start_of_agent" and agent == "reporter":
                         in_reporter = True
                     elif event == "end_of_agent" and agent == "reporter":
                         in_reporter = False
                     elif in_reporter and event == "message":
-                        delta = (payload.get("data") or {}).get("delta") or {}
+                        delta = event_data.get("delta") or {}
                         text = delta.get("content") or ""
                         if text:
                             report_pieces.append(text)
