@@ -558,6 +558,13 @@ def capabilities(
         except Exception:
             detail = "(no body)"
         raise CueAPIError(e.code, detail, "/api/tools/capabilities") from e
+    except urllib.error.URLError as e:
+        # 跟 _request() 同款 transport-layer error 包装,让 capabilities() 也走
+        # CueAPIError(status=0) 路径而非 raw traceback (codex r6)
+        reason = getattr(e, "reason", e)
+        raise CueAPIError(
+            0, f"network unreachable: {reason}", "/api/tools/capabilities"
+        ) from e
 
     raw = resp.read().decode("utf-8")
     payload = json.loads(raw)
