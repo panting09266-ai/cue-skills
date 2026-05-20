@@ -47,7 +47,7 @@ Agent: [reads SKILL.md → triggers +author flow]
 
 ## 状态
 
-**v0.1.0** — Claude Code 已 verify;Codex CLI / Gemini CLI / OpenClaw 通过手动 load SKILL.md 应可工作(未独立 verify)。
+**v0.1.0** — Claude Code + Gemini CLI 已 verify;Codex CLI / OpenClaw 通过手动 load SKILL.md 应可工作(未独立 verify)。
 
 ## 适合谁用
 

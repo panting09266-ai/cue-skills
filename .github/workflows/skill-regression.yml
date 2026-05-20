@@ -24,9 +24,59 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
+
+      - name: Skill frontmatter validator (Codex/Anthropic schema)
+        # codex r3 finding: validator-blocker (e.g. top-level `version` key)
+        # 之前未在 CI 跑,只本地 catch。把它放到 CI 防 frontmatter 类阻断
+        # 在 push 后才被发现。Validator 用 PyYAML — 装一个最小 dep。
+        run: |
+          python3 -m pip install --quiet pyyaml
+          python3 - <<'PY'
+          import re, sys, pathlib
+          import yaml
+          md = pathlib.Path('buddy/SKILL.md').read_text(encoding='utf-8')
+          m = re.match(r'^---\n(.*?)\n---\n', md, re.S)
+          assert m, 'SKILL.md missing frontmatter'
+          fm = yaml.safe_load(m.group(1))
+          allowed = {'allowed-tools', 'description', 'license', 'metadata', 'name'}
+          unexpected = set(fm.keys()) - allowed
+          assert not unexpected, f'frontmatter has unexpected keys: {unexpected}'
+          assert 'name' in fm and 'description' in fm, 'name/description required'
+          print(f'SKILL.md frontmatter OK; keys={sorted(fm.keys())}')
+          PY
+
       - name: Run cue-buddy skill regression
         run: python3 buddy/scripts/test_skill_regression.py
-      - name: Validator self-check (sanity import)
+
+      - name: Run cue_api client contract test (stdlib mock server)
+        # codex r3: 把"capabilities 合约"放进 CI 而非只 local dev 可跑。
+        # 这个 test 用 http.server + threading mock 服务器,不依赖 cubemanus
+        # 或 uvicorn/fastapi,完全 CI-friendly。验证 client wire format:
+        # URL/Bearer/query 序列化/ETag 304/4xx 错误传播。
+        run: python3 buddy/scripts/test_cue_api_client_contract.py
+
+      - name: CLI smoke — validate_template.py --help
+        # codex r3: argparse --help 之前被当文件路径读 FileNotFoundError,
+        # 现已修。CI smoke 防 argparse 集成回归。
+        run: |
+          python3 buddy/scripts/validate_template.py --help | grep -q "validate_template.py"
+          # 无参也应 print help + exit 0,不报错
+          python3 buddy/scripts/validate_template.py >/dev/null
+
+      - name: CLI smoke — cue_api.py capabilities subcommand
+        # codex r3: doc 说有 +capabilities verb 但缺 CLI,现已加。
+        # 无 API key 应 exit 2 + 提示去拿 key,而非 KeyError。
+        run: |
+          set +e
+          out=$(python3 buddy/scripts/cue_api.py capabilities 2>&1)
+          ec=$?
+          set -e
+          echo "$out"
+          # 期望非 0(因为没 API key),且包含 'API key' 提示
+          test "$ec" -ne 0
+          echo "$out" | grep -qi "API key"
+
+      - name: Validator self-check (sanity import + regex 5-family coverage)
         run: |
           python3 -c "
           import sys
@@ -34,7 +84,6 @@ jobs:
           from validate_template import validate, FORBIDDEN_TOOL_PREFIXES, TOOL_NAME_LEAK_RE
           assert callable(validate)
           assert 'search_tool' in FORBIDDEN_TOOL_PREFIXES
-          # smoke: regex covers all 5 prefix families
           for sample in ('get_xxx', 'list_xxx', 'find_xxx', 'search_tool_xxx', 'crawl_tool_xxx'):
               assert TOOL_NAME_LEAK_RE.search(sample), sample
           print('validate_template import + regex coverage OK')

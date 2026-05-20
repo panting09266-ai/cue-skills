@@ -44,7 +44,7 @@ Agent: [reads SKILL.md → triggers +author flow]
 
 ## Status
 
-**v0.1.0** — verified on Claude Code; should work on Codex CLI / Gemini CLI / OpenClaw via manual SKILL.md loading (not yet independently verified).
+**v0.1.0** — verified on Claude Code + Gemini CLI; should work on Codex CLI / OpenClaw via manual SKILL.md loading (not yet independently verified).
 
 ## Who this is for
 
