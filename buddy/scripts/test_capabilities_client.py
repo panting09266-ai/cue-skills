@@ -49,8 +49,17 @@ def _start_minimal_backend() -> tuple[str, threading.Thread]:
     """
     import socket
 
-    import uvicorn
-    from fastapi import FastAPI
+    try:
+        import uvicorn
+        from fastapi import FastAPI
+    except ImportError as e:
+        print(
+            f"[skip] this test requires uvicorn + fastapi (not stdlib): {e}\n"
+            f"       install: pip install uvicorn fastapi\n"
+            f"       or run inside cubemanus .venv which already has them",
+            file=sys.stderr,
+        )
+        sys.exit(0)
 
     from src.api.routes.tools import router as tools_router  # noqa: E402
 

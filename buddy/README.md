@@ -34,8 +34,8 @@ Agent: [reads SKILL.md → triggers +author flow]
          domains (category = supervisor routing label)
        → cross-checks each search_plan dimension against capabilities
          API; warns user if any declared evidence source has no
-         backing category (e.g. industry associations have no
-         dedicated tool — falls back to web_search)
+         backing category (some niche public-source dimensions may
+         fall back to web_search)
        → runs +validate against 7 hard rules
        → on confirmation, POSTs to user's template library
        → optionally runs +test on a real case
@@ -146,7 +146,7 @@ buddy/
 
 ## License
 
-[MIT](LICENSE)
+[MIT](../LICENSE)
 
 ## Contributing
 

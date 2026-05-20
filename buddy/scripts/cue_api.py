@@ -686,6 +686,37 @@ def _cli() -> int:
                 return 2
             print(json.dumps(get_template(sys.argv[2]), ensure_ascii=False, indent=2))
             return 0
+        if cmd == "capabilities":
+            # +capabilities CLI:GET /api/tools/capabilities researcher 端点
+            # 用法:
+            #   cue_api.py capabilities               # bare GET, auto-summary
+            #   cue_api.py capabilities q=公告        # 按关键词过滤
+            #   cue_api.py capabilities category=disclosure_cn
+            #   cue_api.py capabilities fields=default  # 全量 inventory dump
+            #   cue_api.py capabilities q=公告 max_triggers=3
+            kwargs: dict = {}
+            for arg in sys.argv[2:]:
+                if "=" not in arg:
+                    sys.stderr.write(
+                        f"[capabilities] unexpected arg {arg!r}; "
+                        f"use k=v form: q=<term> / category=<label> / "
+                        f"fields=<summary|default|debug> / max_triggers=<int>\n"
+                    )
+                    return 2
+                k, v = arg.split("=", 1)
+                if k == "max_triggers":
+                    kwargs[k] = int(v)
+                elif k in ("fields", "q", "category"):
+                    kwargs[k] = v
+                else:
+                    sys.stderr.write(f"[capabilities] unknown key {k!r}\n")
+                    return 2
+            payload = capabilities(**kwargs)
+            if payload is None:
+                print("[capabilities] 304 Not Modified (cache hit)")
+                return 0
+            print(json.dumps(payload, ensure_ascii=False, indent=2))
+            return 0
         if cmd in ("publish", "unpublish"):
             if len(sys.argv) < 3:
                 print("usage: cue_api.py {publish|unpublish} <template_id>")

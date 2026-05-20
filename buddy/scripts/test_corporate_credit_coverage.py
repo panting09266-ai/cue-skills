@@ -82,8 +82,17 @@ COVERAGE = {
 
 def _start_minimal_backend() -> str:
     """Boot a fresh FastAPI on a free port, mount only tools router."""
-    import uvicorn
-    from fastapi import FastAPI
+    try:
+        import uvicorn
+        from fastapi import FastAPI
+    except ImportError as e:
+        print(
+            f"[skip] this probe requires uvicorn + fastapi (not stdlib): {e}\n"
+            f"       install: pip install uvicorn fastapi\n"
+            f"       or run inside cubemanus .venv",
+            file=sys.stderr,
+        )
+        sys.exit(0)
 
     from src.api.routes.tools import router as tools_router  # noqa: E402
 
