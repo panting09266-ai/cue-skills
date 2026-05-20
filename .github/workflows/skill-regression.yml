@@ -1,0 +1,41 @@
+name: skill-regression
+
+# Run cue-buddy stdlib regression on every push / PR. Skill scripts are
+# stdlib-only Python (no pip install needed), so the matrix stays cheap.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        # Track the same Python versions the cubemanus backend pins (3.12) plus
+        # one rolling latest to catch syntax regressions early.
+        python-version: ["3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Run cue-buddy skill regression
+        run: python3 buddy/scripts/test_skill_regression.py
+      - name: Validator self-check (sanity import)
+        run: |
+          python3 -c "
+          import sys
+          sys.path.insert(0, 'buddy/scripts')
+          from validate_template import validate, FORBIDDEN_TOOL_PREFIXES, TOOL_NAME_LEAK_RE
+          assert callable(validate)
+          assert 'search_tool' in FORBIDDEN_TOOL_PREFIXES
+          # smoke: regex covers all 5 prefix families
+          for sample in ('get_xxx', 'list_xxx', 'find_xxx', 'search_tool_xxx', 'crawl_tool_xxx'):
+              assert TOOL_NAME_LEAK_RE.search(sample), sample
+          print('validate_template import + regex coverage OK')
+          "
