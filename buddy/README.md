@@ -2,7 +2,7 @@
 
 **[English](README.md) · [中文](README.zh-CN.md)**
 
-> An AI-agent skill that lets business experts author, validate, test, and publish [Cue](https://cuecue.cn) "buddy" templates — without writing code.
+> An AI-agent skill that lets business experts author, validate, test, and pin-as-frequent [Cue](https://cuecue.cn) "buddy" templates — without writing code.
 
 ## What is Cue / What is a buddy
 
@@ -12,7 +12,7 @@ A **"buddy" (搭子)** is your personal research companion in Cue. You define a 
 
 ## What this skill is
 
-`cue-buddy` is a [skill](https://docs.anthropic.com/en/docs/agents-and-tools/agent-skills) that plugs into any AI agent (Claude Code, Codex CLI, Gemini CLI, OpenClaw, etc.) and turns natural conversation into Cue template authoring. Business experts (no Python, no API knowledge) talk to their agent in domain language; the agent drafts, validates, creates, tests, tunes, and publishes the template via the Cue production API.
+`cue-buddy` is a [skill](https://docs.anthropic.com/en/docs/agents-and-tools/agent-skills) that plugs into any AI agent (Claude Code, Codex CLI, Gemini CLI, OpenClaw, etc.) and turns natural conversation into Cue template authoring. Business experts (no Python, no API knowledge) talk to their agent in domain language; the agent drafts, validates, creates, tests, tunes, and pins the template as "frequent" (设为常用) via the Cue production API.
 
 A buddy template is just **4 LLM-consumed fields**:
 - **`input_form_spec`** — what inputs the user supplies (with a default fallback)
@@ -20,7 +20,7 @@ A buddy template is just **4 LLM-consumed fields**:
 - **`search_plan`** — research strategy clustered by data source
 - **`report_format`** — the report skeleton (sections + per-section execution blueprints)
 
-Once published, the buddy shows up on the user's cuecue.cn workbench and can run real research tasks (typically 5–15 credits per run; exact cost shown in the workbench).
+Once created, the buddy lives in the user's cuecue.cn template library and can run real research tasks (typically 5–15 credits per run; exact cost shown in the workbench). Mark it as "常用" (frequent) to pin it to the workbench home for quick access.
 
 This skill makes the authoring loop self-serve for business users:
 
@@ -39,7 +39,7 @@ Agent: [reads SKILL.md → triggers +author flow]
        → runs +validate against 7 hard rules
        → on confirmation, POSTs to user's template library
        → optionally runs +test on a real case
-       → on confirmation, +publish to workbench home
+       → on confirmation, +frequent to pin to workbench home
 ```
 
 ## Status
@@ -97,7 +97,7 @@ In your agent, just say what you want:
 "测一下我刚才那个搭子，主体用万科"
 ```
 
-The agent reads SKILL.md and dispatches the right verb (`+author`, `+test`, `+tune`, `+publish`, etc.).
+The agent reads SKILL.md and dispatches the right verb (`+author`, `+test`, `+tune`, `+frequent`, etc.).
 
 ## What you can do
 
@@ -112,8 +112,8 @@ The agent reads SKILL.md and dispatches the right verb (`+author`, `+test`, `+tu
 | `+update` | Modify an existing template | No |
 | `+test` | Run a real research conversation, capture report, run 8 checks | **Yes** (~5–15) |
 | `+tune` | Let LLM revise the template based on your issue notes; diff preview + auto-backup before PUT | **Yes** (~2–6) |
-| `+publish` | Pin the template to your workbench home (`is_frequent=true`) | No |
-| `+unpublish` | Unpin from workbench home | No |
+| `+frequent` | Mark template as "frequent" — pins it to your workbench home (`is_frequent=true`). This is *not* cross-user publishing; Cue has no such primitive. | No |
+| `+unfrequent` | Unmark "frequent" — unpins from workbench home | No |
 
 ## Privacy
 

@@ -40,7 +40,7 @@ Agent: [reads SKILL.md → triggers +author flow]
        → runs +validate against 7 hard rules
        → on confirmation, POSTs to user's template library
        → optionally runs +test on a real case
-       → on confirmation, +publish to workbench home
+       → on confirmation, +frequent 把模板钉到工作台首页"常用"区
 ```
 
 > **范围边界(避免起 buddy 时踩坑)**:Cue 工具面**仅覆盖公开数据源**。需要**私有数据**的场景(银行真正反洗钱 AML 需内部交易流水 / 医疗诊断需电子病历 / 企业内账等)**不适合做成 Cue 搭子**——supervisor 在 catalog 里挑不到匹配工具,只能 web_search 兜底。`+author` 在起草时会调 `+capabilities` 交叉验证 search_plan 各维度,无 category 兜底时 warn 用户。
@@ -100,7 +100,7 @@ python3 scripts/cue_api.py whoami
 "测一下我刚才那个搭子,主体用万科"
 ```
 
-agent 读 SKILL.md 自动调相应 verb(`+author` / `+test` / `+tune` / `+publish` 等)。
+agent 读 SKILL.md 自动调相应 verb(`+author` / `+test` / `+tune` / `+frequent` 等)。
 
 ## 能做什么
 
@@ -115,7 +115,8 @@ agent 读 SKILL.md 自动调相应 verb(`+author` / `+test` / `+tune` / `+publis
 | `+update` | 改已有模板 | 否 |
 | `+test` | 跑一次真实对话,抓报告,跑 8 项验收 | **是**(~5–15) |
 | `+tune` | LLM 基于问题清单优化模板;diff 预览 + 提交前自动备份 | **是**(~2–6) |
-| `+publish` | 把模板钉到工作台首页(`is_frequent=true`) | 否 |
+| `+frequent` | **设为常用** — 把模板钉到工作台首页"常用"区(`is_frequent=true`)。Cue 当前**没有跨用户发布**原语,这只是个人常用入口。 | 否 |
+| `+unfrequent` | 取消"常用",从首页移除 | 否 |
 
 详细 verb-by-verb walkthrough 见 [`SKILL.md`](./SKILL.md)。
 

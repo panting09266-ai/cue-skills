@@ -16,8 +16,8 @@ Public functions:
   - get_template(template_id)          : full template JSON
   - create_template(payload)           : returns the new template
   - update_template(template_id, p)    : returns the updated template
-  - set_template_frequent(id, bool)    : toggle workbench-home pin
-                                         (this is the `+publish` primitive)
+  - set_template_frequent(id, bool)    : toggle workbench "frequent" pin
+                                         (this is the `+frequent` primitive)
   - generate_template(conv_id, req)    : streams the generated 4 fields
                                          (uses seed: bypass when conv_id
                                          is empty or starts with "seed:")
@@ -31,7 +31,7 @@ CLI usage (smoke test from a shell):
     python3 cue_api.py get <template_id>
     python3 cue_api.py create <payload.json>
     python3 cue_api.py update <template_id> <payload.json>
-    python3 cue_api.py {publish|unpublish} <template_id>
+    python3 cue_api.py {frequent|unfrequent} <template_id>
 """
 
 from __future__ import annotations
@@ -578,11 +578,11 @@ def capabilities(
 
 def set_template_frequent(template_id: str, is_frequent: bool = True) -> dict:
     """Toggle the 'frequent' flag on a template — this is what surfaces
-    the template on the user's Cue workbench home as a featured shortcut.
+    the template on the user's Cue workbench "常用" (frequent) shortcuts.
 
-    Maps to the `+publish` verb in the cue-buddy skill. Cue has no
-    cross-user publishing primitive at the API level; "publish" means
-    "show this on my own home page."
+    Maps to the `+frequent` verb in the cue-buddy skill. Cue has no
+    cross-user publishing primitive at the API level; "frequent" simply
+    means "pin this to my own workbench 常用 area for quick access."
     """
     body = {"template_id": template_id, "is_frequent": is_frequent}
     data = _request("POST", "/templates/frequent", body=body)
@@ -744,11 +744,11 @@ def _cli() -> int:
                 return 0
             print(json.dumps(payload, ensure_ascii=False, indent=2))
             return 0
-        if cmd in ("publish", "unpublish"):
+        if cmd in ("frequent", "unfrequent"):
             if len(sys.argv) < 3:
-                print("usage: cue_api.py {publish|unpublish} <template_id>")
+                print("usage: cue_api.py {frequent|unfrequent} <template_id>")
                 return 2
-            res = set_template_frequent(sys.argv[2], is_frequent=(cmd == "publish"))
+            res = set_template_frequent(sys.argv[2], is_frequent=(cmd == "frequent"))
             print(json.dumps(res, ensure_ascii=False, indent=2))
             return 0
         if cmd == "create":
