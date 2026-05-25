@@ -550,11 +550,14 @@ def _known_scenes_from_capabilities() -> list[str] | None:
     try:
         import cue_api  # same scripts/ dir; needs a key + network
 
-        caps = cue_api.capabilities()
+        # 短超时：这是 best-effort lint，不应因网络挂起拖慢 +validate（codex C）。
+        caps = cue_api.capabilities(timeout=3.0)
         scenes = caps.get("playbook_scenes") if isinstance(caps, dict) else None
         if isinstance(scenes, list) and scenes:
             return [str(s) for s in scenes]
-    except Exception:  # noqa: BLE001 — offline/no-key/transport → skip the check
+    except (Exception, SystemExit):
+        # 无 key 时 cue_api.load_config() 抛 SystemExit（非 Exception，必须显式捕获，
+        # 否则离线/无 key 跑 +validate 会直接退出码 2 而非跳过场景检查）（codex A）。
         return None
     return None
 
