@@ -10,7 +10,10 @@
 |---|---|---|
 | `title` | 模板在工作台显示的卡片标题 | `对公授信预尽调底稿` |
 | `primary_category` | 一级分类（行业域） | `银行 / 投研 / 资管 / 合规 / 监管研究` |
-| `secondary_category` | 二级分类（场景） | `预尽调 / 公开合规快照 / 财报点评 / 投顾对比 / 私募尽调` |
+| `secondary_category` | 二级分类（**受控场景**） | `预尽调 / 公开合规快照 / 财报点评 / 投顾对比 / 私募尽调` |
+
+> **secondary_category 是 playbook 的场景轴（受控词表）**：`+author` 时优先从 `+capabilities` 返回的 `playbook_scenes` 里**原样选一个**最贴合的，让同类搭子在 cuecue.cn/playbook 聚类到同一场景；确无贴合的再自拟 6-8 字。`+validate` 会对不在词表内的 secondary_category 给 warning（不阻断创建——自定义场景仅在积累足够同类搭子后才自动浮现成 playbook 场景）。词表单源在服务端，随业务演进。
+
 | `source_conversation_id` | 模板"来自"的对话 ID（用 `seed:<slug>:v1`） | `seed:corporate-credit-pre-diligence:v1` |
 
 ---

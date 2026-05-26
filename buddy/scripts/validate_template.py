@@ -541,8 +541,57 @@ def _check_variable_consistency(payload: dict, out: list[Finding]) -> None:
 # ---------------------------------------------------------------------------
 
 
-def validate(payload: dict) -> list[Finding]:
-    """Run all checks on a template payload. Return list of findings."""
+def _known_scenes_from_capabilities() -> list[str] | None:
+    """Best-effort fetch of the controlled playbook scene vocabulary from
+    `GET /api/tools/capabilities` (field `playbook_scenes`). Returns None when
+    offline / no key / field absent — so `+validate` stays usable offline and
+    never emits a false scene warning. The server is the single source of truth
+    (src/service/playbook_scenes.py)."""
+    try:
+        import cue_api  # same scripts/ dir; needs a key + network
+
+        # 短超时：这是 best-effort lint，不应因网络挂起拖慢 +validate（codex C）。
+        caps = cue_api.capabilities(timeout=3.0)
+        scenes = caps.get("playbook_scenes") if isinstance(caps, dict) else None
+        if isinstance(scenes, list) and scenes:
+            return [str(s) for s in scenes]
+    except (Exception, SystemExit):
+        # 无 key 时 cue_api.load_config() 抛 SystemExit（非 Exception，必须显式捕获，
+        # 否则离线/无 key 跑 +validate 会直接退出码 2 而非跳过场景检查）（codex A）。
+        return None
+    return None
+
+
+def _check_scene_vocab(
+    payload: dict, out: list[Finding], scenes: list[str] | None
+) -> None:
+    """[warning] secondary_category 建议复用受控场景词表，让同类搭子在 playbook 聚类。
+    仅在拿到词表时检查（offline 不误报）。非受控场景不阻断创建，只是不会进 playbook
+    的固定场景（除非积累到浮现阈值）。"""
+    if not scenes:
+        return
+    sc = payload.get("secondary_category")
+    if not isinstance(sc, str) or not sc.strip():
+        return
+    if sc.strip() not in scenes:
+        out.append(
+            Finding(
+                "warning",
+                "secondary_category",
+                (
+                    f"`{sc}` 不在受控场景词表内。要进 playbook 的固定场景，请原样复用其一："
+                    f"{ '、'.join(scenes) }；自定义场景仅在积累足够同类搭子后才会自动浮现。"
+                ),
+            )
+        )
+
+
+def validate(payload: dict, scenes: list[str] | None = None) -> list[Finding]:
+    """Run all checks on a template payload. Return list of findings.
+
+    `scenes`: optional controlled playbook scene vocabulary (for the R-scene
+    warning). Pass the list from `+capabilities` (field `playbook_scenes`);
+    when None the scene check is skipped (offline-safe)."""
     out: list[Finding] = []
     _check_identity(payload, out)
     if isinstance(payload.get("input_form_spec"), str):
@@ -557,6 +606,7 @@ def validate(payload: dict) -> list[Finding]:
     _check_no_admission_verdict(payload, out)
     _check_variable_consistency(payload, out)
     _check_task_input(payload, out)
+    _check_scene_vocab(payload, out, scenes)
     return out
 
 
@@ -594,7 +644,8 @@ def _cli() -> int:
     else:
         payload = json.loads(Path(src).read_text(encoding="utf-8"))
 
-    findings = validate(payload)
+    # 受控场景词表：best-effort 从 capabilities 拉（offline/无 key 时为 None → 跳过场景检查）
+    findings = validate(payload, scenes=_known_scenes_from_capabilities())
     errors = [f for f in findings if f.severity == "error"]
     warnings = [f for f in findings if f.severity == "warning"]
     print(f"\nvalidate: {payload.get('template_id') or payload.get('title') or '(unnamed)'}")
