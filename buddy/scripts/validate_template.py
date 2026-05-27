@@ -131,6 +131,35 @@ def _check_input_form_spec(intro: str, out: list[Finding]) -> None:
         )
 
 
+# title 是搭子在卡片上的「名字」：简洁有力、体现价值。砍虚词，但**别过度简化丢掉区分价值**。
+_TITLE_FLUFF = ["情报简报", "与分析", "全量", "细项", "深度解读", "公开资质"]
+
+
+def _check_title(title: str, out: list[Finding]) -> None:
+    """title = 卡片标题/搭子名：~≤8-10 字、价值优先；砍虚词（公开/全量/细项/与分析/简报/
+    深度），但保留体现价值的词（如 信披属实 / 需求匹配 / 海外执法），别为短而短。"""
+    t = title.strip()
+    n = len(t)
+    if n > 12:
+        out.append(
+            Finding(
+                "warning",
+                "title",
+                f"标题 {n} 字偏长：建议精简到 ~8-10 字、价值优先；砍虚词但保留区分价值的词"
+                "（别过度简化丢掉价值）",
+            )
+        )
+    fluff = [w for w in _TITLE_FLUFF if w in t]
+    if fluff:
+        out.append(
+            Finding(
+                "warning",
+                "title",
+                f"标题含可删虚词 {fluff}：去掉更简洁；但保留体现价值的词",
+            )
+        )
+
+
 # 实现/技术内部词不应出现在 goal —— goal 是搭子在 playbook 卡片上的「简介」，讲
 # **解决什么问题 / 给什么价值**，不讲「怎么实现」。怎么做属于 search_plan。
 _GOAL_IMPL_LEAK = [
@@ -664,6 +693,8 @@ def validate(payload: dict, scenes: list[str] | None = None) -> list[Finding]:
     when None the scene check is skipped (offline-safe)."""
     out: list[Finding] = []
     _check_identity(payload, out)
+    if isinstance(payload.get("title"), str):
+        _check_title(payload["title"], out)
     if isinstance(payload.get("input_form_spec"), str):
         _check_input_form_spec(payload["input_form_spec"], out)
     if isinstance(payload.get("goal"), str):
