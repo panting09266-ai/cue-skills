@@ -23,3 +23,6 @@ Thumbs.db
 .cue/
 config.local.json
 *.bak
+
+# Buddy run logs — local artifacts from +test / buddy runs, not source
+buddy-run-*.md
