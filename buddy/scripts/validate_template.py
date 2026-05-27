@@ -131,19 +131,89 @@ def _check_input_form_spec(intro: str, out: list[Finding]) -> None:
         )
 
 
+# 实现/技术内部词不应出现在 goal —— goal 是搭子在 playbook 卡片上的「简介」，讲
+# **解决什么问题 / 给什么价值**，不讲「怎么实现」。怎么做属于 search_plan。
+_GOAL_IMPL_LEAK = [
+    "LangGraph",
+    "循环图",
+    "批处理",
+    "MECE",
+    "pipeline",
+    "管道",
+    "状态机",
+    "工作流",
+    "原子建模",
+    "全接口",
+    "轨道",
+    "向量",
+    "大模型",
+    "prompt",
+    "评估模型",
+    "估值模型",
+    "自适应",
+]
+
+
 def _check_goal(goal: str, out: list[Finding]) -> None:
-    if "作为" not in goal and "面向" not in goal:
+    """goal 即搭子的简介/卡片文案：要简洁有力、价值优先、不硬码主体、不泄漏实现。
+    （怎么做的细节放 search_plan；免责边界放避坑指南 / report_format。）"""
+    g = goal.strip()
+    n = len(g)
+    # 1. 简洁有力：goal 是卡片简介，不是运行手册。
+    if n > 200:
         out.append(
-            Finding("warning", "goal", "建议以 `作为...` 或 `面向...` 开头（角色代入句式）")
+            Finding(
+                "error",
+                "goal",
+                f"长度 {n} 过长（>200）：goal 是搭子简介/卡片文案，应简洁有力、价值优先；"
+                "把维度与「怎么做」放进 search_plan，不要堆进 goal",
+            )
         )
-    # Reject numbered checklist
-    numbered = re.findall(r"^\s*\d+\.\s", goal, re.MULTILINE)
+    elif n > 100:
+        out.append(
+            Finding(
+                "warning",
+                "goal",
+                f"长度 {n} 偏长（>100）：建议收敛到一句价值优先的简介（参考 ~40-80 字）",
+            )
+        )
+    # 2. 不泄漏实现/技术词（讲价值不讲实现）。
+    leaks = [w for w in _GOAL_IMPL_LEAK if w.lower() in g.lower()]
+    if leaks:
+        out.append(
+            Finding(
+                "error",
+                "goal",
+                f"出现实现/技术内部词 {leaks[:4]}：goal 讲价值不讲实现，删除这些表述",
+            )
+        )
+    # 3. 免责/边界声明不进 goal（卡片不该被法律尾注占满）。
+    if re.search(r"(不替代|不构成|严格不|仅(?:做|提供|基于|在公开)|凡(?:公开|未|无|来源))", g):
+        out.append(
+            Finding(
+                "warning",
+                "goal",
+                "goal 含免责/边界声明：免责放 search_plan 避坑指南或 report_format，"
+                "卡片简介只讲价值",
+            )
+        )
+    # 4. 长「作为…助手」角色前缀：建议价值/解决什么问题开头（角色由 input_form/场景体现）。
+    if re.match(r"^作为[^，。]{4,40}助手[，,]", g) and n > 90:
+        out.append(
+            Finding(
+                "warning",
+                "goal",
+                "以「作为…助手，」长角色前缀 + 长串「怎么做」开头：建议改为价值优先句式",
+            )
+        )
+    # 5. 拒绝编号清单。
+    numbered = re.findall(r"^\s*\d+\.\s", g, re.MULTILINE)
     if numbered:
         out.append(
             Finding(
                 "error",
                 "goal",
-                f"必须是单段攻击力句式，不能是编号清单（发现 {len(numbered)} 个编号）",
+                f"必须是简洁有力的简介，不能是编号清单（发现 {len(numbered)} 个编号）",
             )
         )
 
