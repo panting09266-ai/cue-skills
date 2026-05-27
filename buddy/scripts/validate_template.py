@@ -131,19 +131,118 @@ def _check_input_form_spec(intro: str, out: list[Finding]) -> None:
         )
 
 
-def _check_goal(goal: str, out: list[Finding]) -> None:
-    if "作为" not in goal and "面向" not in goal:
+# title 是搭子在卡片上的「名字」：简洁有力、体现价值。砍虚词，但**别过度简化丢掉区分价值**。
+_TITLE_FLUFF = ["情报简报", "与分析", "全量", "细项", "深度解读", "公开资质"]
+
+
+def _check_title(title: str, out: list[Finding]) -> None:
+    """title = 卡片标题/搭子名：~≤8-10 字、价值优先；砍虚词（公开/全量/细项/与分析/简报/
+    深度），但保留体现价值的词（如 信披属实 / 需求匹配 / 海外执法），别为短而短。"""
+    t = title.strip()
+    n = len(t)
+    if n > 12:
         out.append(
-            Finding("warning", "goal", "建议以 `作为...` 或 `面向...` 开头（角色代入句式）")
+            Finding(
+                "warning",
+                "title",
+                f"标题 {n} 字偏长：建议精简到 ~8-10 字、价值优先；砍虚词但保留区分价值的词"
+                "（别过度简化丢掉价值）",
+            )
         )
-    # Reject numbered checklist
-    numbered = re.findall(r"^\s*\d+\.\s", goal, re.MULTILINE)
+    fluff = [w for w in _TITLE_FLUFF if w in t]
+    if fluff:
+        out.append(
+            Finding(
+                "warning",
+                "title",
+                f"标题含可删虚词 {fluff}：去掉更简洁；但保留体现价值的词",
+            )
+        )
+
+
+# 实现/技术内部词不应出现在 goal —— goal 是搭子在 playbook 卡片上的「简介」，讲
+# **解决什么问题 / 给什么价值**，不讲「怎么实现」。怎么做属于 search_plan。
+_GOAL_IMPL_LEAK = [
+    "LangGraph",
+    "循环图",
+    "批处理",
+    "MECE",
+    "pipeline",
+    "管道",
+    "状态机",
+    "工作流",
+    "原子建模",
+    "全接口",
+    "轨道",
+    "向量",
+    "大模型",
+    "prompt",
+    "评估模型",
+    "估值模型",
+    "自适应",
+]
+
+
+def _check_goal(goal: str, out: list[Finding]) -> None:
+    """goal 即搭子的简介/卡片文案：要简洁有力、价值优先、不硬码主体、不泄漏实现。
+    （怎么做的细节放 search_plan；免责边界放避坑指南 / report_format。）"""
+    g = goal.strip()
+    n = len(g)
+    # 1. 简洁有力：goal 是卡片简介，不是运行手册。
+    if n > 200:
+        out.append(
+            Finding(
+                "error",
+                "goal",
+                f"长度 {n} 过长（>200）：goal 是搭子简介/卡片文案，应简洁有力、价值优先；"
+                "把维度与「怎么做」放进 search_plan，不要堆进 goal",
+            )
+        )
+    elif n > 100:
+        out.append(
+            Finding(
+                "warning",
+                "goal",
+                f"长度 {n} 偏长（>100）：建议收敛到一句价值优先的简介（参考 ~40-80 字）",
+            )
+        )
+    # 2. 不泄漏实现/技术词（讲价值不讲实现）。
+    leaks = [w for w in _GOAL_IMPL_LEAK if w.lower() in g.lower()]
+    if leaks:
+        out.append(
+            Finding(
+                "error",
+                "goal",
+                f"出现实现/技术内部词 {leaks[:4]}：goal 讲价值不讲实现，删除这些表述",
+            )
+        )
+    # 3. 免责/边界声明不进 goal（卡片不该被法律尾注占满）。
+    if re.search(r"(不替代|不构成|严格不|仅(?:做|提供|基于|在公开)|凡(?:公开|未|无|来源))", g):
+        out.append(
+            Finding(
+                "warning",
+                "goal",
+                "goal 含免责/边界声明：免责放 search_plan 避坑指南或 report_format，"
+                "卡片简介只讲价值",
+            )
+        )
+    # 4. 长「作为…助手」角色前缀：建议价值/解决什么问题开头（角色由 input_form/场景体现）。
+    if re.match(r"^作为[^，。]{4,40}助手[，,]", g) and n > 90:
+        out.append(
+            Finding(
+                "warning",
+                "goal",
+                "以「作为…助手，」长角色前缀 + 长串「怎么做」开头：建议改为价值优先句式",
+            )
+        )
+    # 5. 拒绝编号清单。
+    numbered = re.findall(r"^\s*\d+\.\s", g, re.MULTILINE)
     if numbered:
         out.append(
             Finding(
                 "error",
                 "goal",
-                f"必须是单段攻击力句式，不能是编号清单（发现 {len(numbered)} 个编号）",
+                f"必须是简洁有力的简介，不能是编号清单（发现 {len(numbered)} 个编号）",
             )
         )
 
@@ -594,6 +693,8 @@ def validate(payload: dict, scenes: list[str] | None = None) -> list[Finding]:
     when None the scene check is skipped (offline-safe)."""
     out: list[Finding] = []
     _check_identity(payload, out)
+    if isinstance(payload.get("title"), str):
+        _check_title(payload["title"], out)
     if isinstance(payload.get("input_form_spec"), str):
         _check_input_form_spec(payload["input_form_spec"], out)
     if isinstance(payload.get("goal"), str):
