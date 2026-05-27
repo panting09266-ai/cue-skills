@@ -16,7 +16,7 @@ A **"buddy" (搭子)** is your personal research companion in Cue. You define a 
 
 A buddy template is just **4 LLM-consumed fields**:
 - **`input_form_spec`** — what inputs the user supplies (with a default fallback)
-- **`goal`** — the buddy's role, user pain point, and value proposition
+- **`goal`** — a concise, value-first one-paragraph intro (the buddy's card copy): what problem it solves / what value it delivers — no role-play preamble, no implementation detail, no hardcoded subject
 - **`search_plan`** — research strategy clustered by data source
 - **`report_format`** — the report skeleton (sections + per-section execution blueprints)
 
