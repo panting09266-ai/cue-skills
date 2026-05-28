@@ -63,6 +63,27 @@ class TestSkillMd(unittest.TestCase):
         # Codex Block B fix: matching is low-confidence, never auto-pick.
         self.assertRegex(self.md, r"不自动选搭子|never auto-?select")
 
+    def test_weak_match_nudge_uses_user_facing_phrasing(self):
+        """When all candidates are weak matches, surface a one-liner that
+        nudges toward building a new buddy. The user-facing text MUST use
+        natural Chinese ('做个新搭子') — leaking the internal verb name
+        `+author` directly to the user would be jargon.
+
+        Empirical basis: across 7 real queries against the live catalog of
+        106 templates, weak/zero-match cases were common enough (e.g. 毛利
+        / 业绩超预期) that surfacing this escape hatch matters."""
+        self.assertIn("要不做个新搭子", self.md)
+        self.assertRegex(self.md, r"弱匹配|匹配.*?不强")
+        # User-facing nudge prose must NOT leak the internal verb name.
+        # Check inside the literal blockquote line only — agent-routing
+        # guidance further down may legitimately mention +author internally.
+        nudge_lines = re.findall(r"> 匹配都不强.*$", self.md, re.M)
+        for line in nudge_lines:
+            self.assertNotIn(
+                "+author", line,
+                "user-facing weak-match prose must not leak +author verb",
+            )
+
     def test_no_delete_verb_in_verb_table(self):
         # Hard rule 5: skill must not DECLARE +delete in the verb table.
         # Scoped to verb-table row form `| `+delete`` so the hard-rule prose
