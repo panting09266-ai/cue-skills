@@ -22,7 +22,7 @@ A buddy template is just **4 LLM-consumed fields**:
 - **`search_plan`** — research strategy clustered by data source
 - **`report_format`** — the report skeleton (sections + per-section execution blueprints)
 
-Once created, the buddy lives in the user's cuecue.cn template library and can run real research tasks (typically 5–15 credits per run; exact cost shown in the workbench). Mark it as "常用" (frequent) to pin it to the workbench home for quick access.
+Once created, the buddy lives in the user's cuecue.cn template library and can run real research tasks (typically 3–8 积分 / credits per run; exact cost shown in the workbench). Mark it as "常用" (frequent) to pin it to the workbench home for quick access.
 
 This skill makes the authoring loop self-serve for business users:
 
@@ -112,8 +112,8 @@ The agent reads SKILL.md and dispatches the right verb (`+author`, `+test`, `+tu
 | `+list` | List your templates | No |
 | `+get` | Fetch one full template | No |
 | `+update` | Modify an existing template | No |
-| `+test` | Run a real research conversation, capture report, run 8 checks | **Yes** (~5–15) |
-| `+tune` | Let LLM revise the template based on your issue notes; diff preview + auto-backup before PUT | **Yes** (~2–6) |
+| `+test` | Run a real research conversation, capture report, run 8 checks | **Yes** (~3–8 积分) |
+| `+tune` | Let LLM revise the template based on your issue notes; diff preview + auto-backup before PUT | **Yes** (~1–3 积分) |
 | `+frequent` | Mark template as "frequent" — pins it to your workbench home (`is_frequent=true`). This is *not* cross-user publishing; Cue has no such primitive. | No |
 | `+unfrequent` | Unmark "frequent" — unpins from workbench home | No |
 

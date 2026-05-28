@@ -14,7 +14,7 @@ Flow:
     5. Print + (optional) save Markdown run report
 
 Notes:
-    - Each invocation consumes Cue credits (typical 5-15 per run).
+    - Each invocation consumes Cue credits (typical 3-8 积分 per run).
     - The script asks for explicit confirmation before starting.
     - No deletion / publishing / sensitive actions — read-only test.
     - The query sent is a synthetic validation prompt ("请基于公开信息研究 <entity>")
@@ -397,8 +397,8 @@ def main(argv: list[str] | None = None) -> int:
     if not args.yes:
         sys.stderr.write(
             f"\n[+test] 将以主体 '{args.entity}' 跑模板 {args.template_id}\n"
-            f"        实际消耗的 credits 取决于模板复杂度（章节数、调研维度数、"
-            "工具触发次数），可能远超过粗略估算的 5-15。"
+            f"        实际消耗的积分取决于模板复杂度（章节数、调研维度数、"
+            "工具触发次数），可能远超过粗略估算的 3-8。"
             "前 1-2 次跑是为了校准——确切费用见 cuecue.cn 工作台。"
             "继续？[y/N]: "
         )

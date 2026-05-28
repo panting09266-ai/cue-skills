@@ -18,7 +18,7 @@ Flow:
     7. PUT /api/templates/<id>             → persist
 
 Notes:
-    - Consumes Cue credits (typically 2-6 per tune call).
+    - Consumes Cue credits (typically 1-3 积分 per tune call).
     - The generated draft is **shown to user first**; no auto-PUT.
 """
 
@@ -159,7 +159,7 @@ def main(argv: list[str] | None = None) -> int:
     if not args.yes:
         sys.stderr.write(
             "\n[+tune] 将调用 /api/generate_template 重新生成 4 字段。\n"
-            "        实际 credits 取决于现有模板和问题清单长度（粗略 2-6 起步），"
+            "        实际积分取决于现有模板和问题清单长度（粗略 1-3 起步），"
             "确切费用见 cuecue.cn 工作台。继续？[y/N]: "
         )
         sys.stderr.flush()
