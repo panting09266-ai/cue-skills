@@ -636,10 +636,15 @@ def rewrite(input: str, device_type: str = "cli") -> dict:
     .generate_rewrite_with_profile (src/service/rewrite_service.py:108)
     applies src/prompts/rewrite_prompt.py with the caller's USER_PROFILE.
 
-    Returns the parsed JSON: keys include `_thinking`, `user_confirmation`
-    (a confirm string to show the user), `task_node` (intent_tag, persona,
-    target, methodology), `rewritten_mandate` (the structured mandate to
-    send to /chat/stream), and `safety_flag` (pii_masked list).
+    Returns the unwrapped RewriteData dict (matches set_template_frequent's
+    `data["data"]` unwrap convention). Keys: `thinking`, `user_confirmation`
+    (a confirm string to show the user), `task_node` (intent_tag,
+    agent_persona, target_subject, search_methodology), `rewritten_mandate`
+    (the structured mandate to send to /chat/stream), and `safety_flag`
+    (pii_masked list, risk_category). Per backend
+    `src/api/schemas/rewrite.py:RewriteData` the field is `thinking`,
+    NOT `_thinking` (rewrite_prompt.py's template-string nomenclature drifted
+    from the actual response schema).
 
     Used by cue-research's free-form path so privacy masking + public-source
     constraint + intent amplification apply — chat_stream itself does NOT
@@ -671,7 +676,13 @@ def rewrite(input: str, device_type: str = "cli") -> dict:
         reason = getattr(e, "reason", e)
         raise CueAPIError(0, f"network unreachable: {reason}", "/api/rewrite") from e
     raw = resp.read().decode("utf-8")
-    return json.loads(raw) if raw else {}
+    payload = json.loads(raw) if raw else {}
+    # Backend wraps in DataResponse(data=RewriteData(...)) — unwrap so the
+    # caller gets {thinking, user_confirmation, task_node, rewritten_mandate,
+    # safety_flag} directly. See cubemanus src/api/routes/rewrite.py:85.
+    if isinstance(payload, dict) and isinstance(payload.get("data"), dict):
+        return payload["data"]
+    return payload or {}
 
 
 # ---------------------------------------------------------------------------
