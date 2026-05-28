@@ -4,6 +4,8 @@
 
 > 一个 AI agent skill,让业务专家通过对话起草、校验、测试、设为常用 [Cue](https://cuecue.cn) "搭子"调研模板——**不用写一行代码**。
 
+> **兄弟 skill:** [`cue-research`](../cue-research) — 在你的 AI agent 里**用**搭子(问 → 匹配 → 确认 → 跑 → 可选沉淀)。cue-buddy 负责**做**搭子,cue-research 负责**用**。
+
 ## Cue 是什么 / 搭子是什么
 
 [Cue](https://cuecue.cn) 是面向复杂金融与商业场景的 **Deep Research Agent + Intelligence Sentinel** 平台。后端从 **300+ 专业数据工具**(A 股/港股/美股披露 / 工商 / 司法 / 监管 / 资金流 / 行业研报 / 政府采购)里挑工具、多源交叉验证,**每个结论附来源链接**——把"在十个网站之间来回切半天"压到几分钟。
