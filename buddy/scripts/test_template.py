@@ -191,6 +191,37 @@ def _check_disclaimer(template_rf: str, report: str) -> CheckResult:
     )
 
 
+# R10 runtime guard: if the template asked for a `报告时间` field, the produced
+# report must (a) have a 报告时间 line and (b) NOT contain the literal placeholder
+# `<由 ...` (which means the reporter LLM ignored the fill instruction).
+_REPORT_TIME_LINE_RE = re.compile(r"(?m)^[>\s]*报告时间\s*[:：]")
+_PLACEHOLDER_LEAK_RE = re.compile(r"<由\s*LLM\s*填充>|<由\s*reporter\s*填|\{CURRENT_DATE\}")
+
+
+def _check_report_time_filled(template_rf: str, report: str) -> CheckResult:
+    """R10 runtime guard:
+    - if template has `报告时间`, produced report must too;
+    - produced report must NOT contain `<由 LLM 填充>` / `<由 reporter 填...>` /
+      `{CURRENT_DATE}` literals (means reporter forgot to fill placeholder)."""
+    needs = "报告时间" in template_rf
+    if not needs:
+        return CheckResult(name="报告时间字段", ok=True, detail="(template requires none)")
+    leaks = _PLACEHOLDER_LEAK_RE.findall(report)
+    if leaks:
+        return CheckResult(
+            name="报告时间字段",
+            ok=False,
+            detail=f"placeholder leaked into report: {leaks[:2]} — reporter LLM 没填",
+        )
+    if not _REPORT_TIME_LINE_RE.search(report):
+        return CheckResult(
+            name="报告时间字段",
+            ok=False,
+            detail="template has `报告时间` but produced report lacks the line",
+        )
+    return CheckResult(name="报告时间字段", ok=True, detail="present, no placeholder leak")
+
+
 def run_checks(template: dict, entity: str, report: str) -> list[CheckResult]:
     rf = template.get("report_format", "")
     return [
@@ -202,6 +233,7 @@ def run_checks(template: dict, entity: str, report: str) -> list[CheckResult]:
         _check_section_titles_appear(rf, report),
         _check_no_tool_names(report),
         _check_disclaimer(rf, report),
+        _check_report_time_filled(rf, report),
     ]
 
 
