@@ -20,6 +20,7 @@ CI 友好 (stdlib only),不需要 cubemanus repo / uvicorn / fastapi。
 
 from __future__ import annotations
 
+import contextlib
 import json
 import os
 import socket
@@ -32,6 +33,42 @@ from urllib.parse import parse_qs, urlparse
 
 _HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(_HERE))
+
+
+@contextlib.contextmanager
+def mock_server(handler_fn):
+    """Spin up a one-shot stdlib mock HTTP server for a single test.
+
+    ``handler_fn(req)`` receives a BaseHTTPRequestHandler instance with
+    both do_GET and do_POST dispatched to it.  The context manager yields
+    the base URL (``http://127.0.0.1:<port>/api``) so callers can set
+    ``CUE_API_BASE`` before exercising the client under test.
+
+    The server is shut down when the ``with`` block exits.
+    """
+    # Find a free port.
+    _sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    _sock.bind(("127.0.0.1", 0))
+    port = _sock.getsockname()[1]
+    _sock.close()
+
+    class _DynamicHandler(BaseHTTPRequestHandler):
+        def log_message(self, *args, **kwargs) -> None:  # noqa: D401
+            return
+
+        def do_GET(self) -> None:
+            handler_fn(self)
+
+        def do_POST(self) -> None:
+            handler_fn(self)
+
+    srv = ThreadingHTTPServer(("127.0.0.1", port), _DynamicHandler)
+    t = threading.Thread(target=srv.serve_forever, daemon=True)
+    t.start()
+    try:
+        yield f"http://127.0.0.1:{port}/api"
+    finally:
+        srv.shutdown()
 
 
 # Canned capabilities payload (shape mirrors cubemanus
@@ -280,6 +317,47 @@ class Case5_NoRegressionOnRetry(unittest.TestCase):
         # Mock returns the same payload + same etag both times
         self.assertEqual(body1["_etag"], body2["_etag"])
         self.assertEqual(body1["counts"], body2["counts"])
+
+
+import cue_api as _cue_api_module  # noqa: E402 — needed for search_templates tests
+
+
+class Case6_SearchTemplates(unittest.TestCase):
+    def test_search_templates_keyword_includes_system_and_pagination(self):
+        """search_templates posts {keyword, include_system, page, page_size} and
+        returns unwrapped items list (matching get_templates' unwrap convention)."""
+        captured = {}
+
+        def handler(req):
+            captured["path"] = req.path
+            captured["auth"] = req.headers.get("Authorization")
+            length = int(req.headers.get("Content-Length", "0"))
+            captured["body"] = json.loads(req.rfile.read(length))
+            body = {
+                "data": {
+                    "items": [{"template_id": "t1", "title": "财报分析"}],
+                    "total": 1,
+                    "page": 1,
+                    "page_size": 20,
+                }
+            }
+            req.send_response(200)
+            req.send_header("Content-Type", "application/json")
+            req.end_headers()
+            req.wfile.write(json.dumps(body).encode())
+
+        with mock_server(handler) as base:
+            os.environ["CUE_API_BASE"] = base
+            os.environ["CUE_API_KEY"] = "sk-test"
+            items = _cue_api_module.search_templates(keyword="财报", include_system=True)
+
+        self.assertEqual(captured["path"], "/api/templates/search")
+        self.assertEqual(captured["auth"], "Bearer sk-test")
+        self.assertEqual(
+            captured["body"],
+            {"keyword": "财报", "include_system": True, "page": 1, "page_size": 20},
+        )
+        self.assertEqual(items, [{"template_id": "t1", "title": "财报分析"}])
 
 
 if __name__ == "__main__":

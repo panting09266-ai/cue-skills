@@ -239,6 +239,41 @@ def get_template(template_id: str) -> dict:
     return data or {}
 
 
+def search_templates(
+    keyword: str,
+    include_system: bool = True,
+    page: int = 1,
+    page_size: int = 20,
+) -> list[dict]:
+    """POST /api/templates/search — keyword search over templates.
+
+    Backend (cubemanus src/api/routes/template.py:753) accepts a
+    TemplateShareRequest with `keyword` (str, stripped server-side),
+    `include_system` (bool), and pagination. The underlying SQL only
+    matches title + primary_category + secondary_category
+    (service/template.py:1823-1825), NOT goal/input — so callers
+    (e.g. cue-research) should treat results as low-confidence candidates,
+    try a few keyword variants, and never auto-select.
+
+    Returns the unwrapped items list (matches get_templates' convention).
+    """
+    body = {
+        "keyword": keyword,
+        "include_system": include_system,
+        "page": page,
+        "page_size": page_size,
+    }
+    data = _request("POST", "/templates/search", body=body)
+    if isinstance(data, dict):
+        payload = data.get("data")
+        if isinstance(payload, dict):
+            return payload.get("items") or []
+        return data.get("items") or []
+    if isinstance(data, list):
+        return data
+    return []
+
+
 # 后端 schema 字段(`src/api/schemas/template.py` CreateTemplateRequest /
 # UpdateTemplateRequest / CreateRecommendedTaskRequest)只支持 schedules,
 # DB 列 task_cron_expressions / task_configs 是 server-internal。client
