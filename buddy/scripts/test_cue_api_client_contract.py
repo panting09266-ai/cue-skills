@@ -397,6 +397,46 @@ class Case7_Rewrite(unittest.TestCase):
         self.assertTrue(result["rewritten_mandate"].startswith("**【调研目标】**"))
 
 
+class Case8_ChatStream(unittest.TestCase):
+    def test_chat_stream_yields_event_data_tuples_from_sse(self):
+        """chat_stream parses lines `event: X\\ndata: Y\\n\\n` into (X, Y) tuples,
+        in order. Headers carry Authorization + Accept: text/event-stream."""
+        captured = {}
+        def handler(req):
+            captured["path"] = req.path
+            captured["auth"] = req.headers.get("Authorization")
+            captured["accept"] = req.headers.get("Accept")
+            length = int(req.headers.get("Content-Length", "0"))
+            captured["body"] = json.loads(req.rfile.read(length))
+            req.send_response(200)
+            req.send_header("Content-Type", "text/event-stream")
+            req.end_headers()
+            sse = (
+                b"event: start_of_agent\n"
+                b'data: {"agent_name":"reporter"}\n\n'
+                b"event: message\n"
+                b'data: {"data":{"delta":{"content":"hi"}}}\n\n'
+                b"event: end_of_agent\n"
+                b'data: {"agent_name":"reporter"}\n\n'
+            )
+            req.wfile.write(sse)
+        with mock_server(handler) as base:
+            os.environ["CUE_API_BASE"] = base
+            os.environ["CUE_API_KEY"] = "sk-test"
+            events = list(_cue_api_module.chat_stream(
+                {"messages": [{"role": "user", "content": "x"}], "conversation_id": "c1",
+                 "chat_id": "ch1", "template_id": "t1", "need_analysis": False,
+                 "need_confirm": False, "need_underlying": False, "need_recommend": False},
+                max_seconds=5,
+            ))
+        self.assertEqual(captured["path"], "/api/chat/stream")
+        self.assertEqual(captured["auth"], "Bearer sk-test")
+        self.assertEqual(captured["accept"], "text/event-stream")
+        self.assertEqual(events[0][0], "start_of_agent")
+        self.assertEqual(events[1], ("message", '{"data":{"delta":{"content":"hi"}}}'))
+        self.assertEqual(events[2][0], "end_of_agent")
+
+
 if __name__ == "__main__":
     try:
         unittest.main(verbosity=2)
