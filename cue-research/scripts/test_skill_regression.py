@@ -63,6 +63,31 @@ class TestSkillMd(unittest.TestCase):
         # Codex Block B fix: matching is low-confidence, never auto-pick.
         self.assertRegex(self.md, r"不自动选搭子|never auto-?select")
 
+    def test_stage6_save_prompt_does_not_leak_internal_verbs_to_user(self):
+        """Codex onboarding review F: Stage 6 prompt previously read
+        `1. 沉淀(handoff 给 cue-buddy 的 +author / +validate / 人工确认 +create)`,
+        which leaks internal verb names to the user — directly contradicting
+        the elsewhere-stated rule that user-facing prose must not mention
+        +author / +validate / +create. Test the literal blockquote line
+        shown to the user under Stage 6 doesn't contain those verbs."""
+        import re as _re
+        # Find the Stage 6 question blockquote (lines after '## Stage 6'
+        # heading that start with '>' and form the user-facing prompt).
+        stage6_match = _re.search(
+            r"###?\s*Stage 6:.*?(?=###?\s*Stage|\Z)", self.md, _re.S
+        )
+        self.assertIsNotNone(stage6_match, "Stage 6 section not found")
+        stage6_text = stage6_match.group(0)
+        # User-facing lines are inside `> ...` blockquotes; collect them.
+        user_facing = _re.findall(r"^>.*$", stage6_text, _re.M)
+        joined = "\n".join(user_facing)
+        for forbidden in ("+author", "+validate", "+create"):
+            self.assertNotIn(
+                forbidden, joined,
+                f"Stage 6 user-facing prompt must not leak `{forbidden}` "
+                f"(internal verb); use natural language like '存' / '做成搭子'.",
+            )
+
     def test_weak_match_nudge_uses_user_facing_phrasing(self):
         """When all candidates are weak matches, surface a one-liner that
         nudges toward building a new buddy. The user-facing text MUST use

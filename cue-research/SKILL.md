@@ -151,16 +151,15 @@ payload = {
 
 ### Stage 6: 沉淀为搭子(可选 handoff 给 cue-buddy)
 
-Stage 5 满意且是 4b 自由式跑时,问:
-> 是否把这次调研沉淀成搭子模板?(下次同类问题就有搭子直接用)
-> 1. 沉淀(handoff 给 cue-buddy 的 +author / +validate / 人工确认 +create)
-> 2. 不沉淀
+Stage 5 满意且是 4b 自由式跑时,问用户(**对外文案不出现 verb 名**):
+> 这次调研有用,要不要存成一个新搭子?下次同类问题就有现成的可以用。
+> 1. 存
+> 2. 不用
 
-用户选 **1** 后:
-- 把成功跑的 `conversation_id` + 原问题 + reporter 报告交给 cue-buddy。
-- 触发 cue-buddy 的 `+author` 流(generate_template 用 `template_history_by_conversation_id(conversation_id)` 真的能拿到本次跑的历史,详见 cubemanus template.py:226-259)。
-- 走 cue-buddy 的 `+validate` → `+create` 落库。
-- 这是**显式的、用户确认的**一步,不自动。
+用户选 **1** 后,agent **内部路由**(以下是给 agent 看的,不出现在跟用户的对话里):
+- 把成功跑的 `conversation_id` + 原问题 + reporter 报告交给 cue-buddy 的 `+author` 流(`generate_template` 用 `template_history_by_conversation_id(conversation_id)` 真的能拿到本次跑的历史,详见 cubemanus template.py:226-259)。
+- 走 cue-buddy 的 `+validate` → 用户确认 → `+create` 落库。
+- 这是**显式的、用户确认的**一步,不自动。**对用户文案只说"存""帮你存""做成搭子",不要说"+author"/"+validate"/"+create"**。
 
 ## Hard rules(铁律)
 
