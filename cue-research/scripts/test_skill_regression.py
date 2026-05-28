@@ -125,6 +125,53 @@ class TestSkillMd(unittest.TestCase):
             "SKILL.md hard rules must mention credit confirmation",
         )
 
+    def test_stage2_uses_full_list_semantic_picking(self):
+        """Stage 2 must use single-stage full-list + agent semantic picking,
+        NOT the old keyword-search-variants approach. Empirically verified
+        across 6 real queries against the live 106-template catalog:
+        full-list picking won 4/6 vs backend keyword search; 1 tie; 1
+        honest weak-match fallback (instead of the old confident-but-wrong
+        keyword approach which mapped 「比亚迪 vs 长城混动竞争」 to 「对公竞品
+        情报速递」 — banking, not auto).
+        """
+        import re as _re
+        stage2 = _re.search(r"###?\s*Stage 2:.*?(?=###?\s*Stage|\Z)", self.md, _re.S)
+        self.assertIsNotNone(stage2, "Stage 2 section not found")
+        s2 = stage2.group(0)
+        # Must instruct fetching the full pool (keyword=" " + include_system=True).
+        self.assertRegex(
+            s2, r'keyword\s*=\s*[\'"]\s+[\'"].*include_system\s*=\s*True|拉(?:取)?(?:所有|全集|完整)',
+            "Stage 2 must instruct fetching the full visible pool",
+        )
+        # Must use secondary_category as the grouping axis (it has cleaner
+        # use-case-oriented clusters than primary_category — verified
+        # empirically: 34 cats vs 46, top 12 cover ~80% of templates).
+        self.assertIn("secondary_category", s2)
+        # Must distinguish entity vs intent.
+        self.assertRegex(s2, r"主体.*意图|实体.*意图")
+        # Must NOT advise the OLD keyword-variant search strategy.
+        self.assertNotRegex(
+            s2, r"2-3 个 keyword 变体.*分别搜|keyword 变体.*合并去重",
+            "Stage 2 should no longer use keyword-search variants — switched to full-list",
+        )
+
+    def test_hard_rule_entity_goes_to_task_input_only(self):
+        """Hard Rule 6 (mechanism-agnostic): entity names ONLY go into
+        task_input — never enter template matching, regardless of which
+        matching mechanism is in use (today: full-list + semantic picking;
+        future: maybe two-stage with secondary-cat as Stage A). Earlier
+        we drafted a narrower version of this rule tied to keyword-search
+        strip; the reframed version generalizes."""
+        import re as _re
+        hr = _re.search(r"##\s*Hard rules.*?(?=^##\s|\Z)", self.md, _re.S | _re.M)
+        self.assertIsNotNone(hr)
+        hr_text = hr.group(0)
+        self.assertRegex(
+            hr_text,
+            r"主体名.*task_input|task_input.*主体|绝不进模板匹配",
+            "Hard Rule 6 must codify entity→task_input only (mechanism-agnostic)",
+        )
+
     def test_no_client_side_rewrite_reimpl_rule_present(self):
         # Hard rule 4: don't reimplement backend rewrite logic in the agent.
         # Look for either a Chinese phrasing or an English one.
