@@ -20,6 +20,8 @@ CI 友好 (stdlib only),不需要 cubemanus repo / uvicorn / fastapi。
 
 from __future__ import annotations
 
+import atexit
+import contextlib
 import json
 import os
 import socket
@@ -32,6 +34,43 @@ from urllib.parse import parse_qs, urlparse
 
 _HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(_HERE))
+
+
+@contextlib.contextmanager
+def mock_server(handler_fn):
+    """Spin up a one-shot stdlib mock HTTP server for a single test.
+
+    ``handler_fn(req)`` receives a BaseHTTPRequestHandler instance with
+    both do_GET and do_POST dispatched to it.  The context manager yields
+    the base URL (``http://127.0.0.1:<port>/api``) so callers can set
+    ``CUE_API_BASE`` before exercising the client under test.
+
+    The server is shut down when the ``with`` block exits.
+    """
+    # Find a free port.
+    _sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    _sock.bind(("127.0.0.1", 0))
+    port = _sock.getsockname()[1]
+    _sock.close()
+
+    class _DynamicHandler(BaseHTTPRequestHandler):
+        def log_message(self, *args, **kwargs) -> None:  # noqa: D401
+            return
+
+        def do_GET(self) -> None:
+            handler_fn(self)
+
+        def do_POST(self) -> None:
+            handler_fn(self)
+
+    srv = ThreadingHTTPServer(("127.0.0.1", port), _DynamicHandler)
+    t = threading.Thread(target=srv.serve_forever, daemon=True)
+    t.start()
+    try:
+        yield f"http://127.0.0.1:{port}/api"
+    finally:
+        srv.shutdown()
+        srv.server_close()  # close the listening socket (silences ResourceWarning)
 
 
 # Canned capabilities payload (shape mirrors cubemanus
@@ -186,6 +225,16 @@ _BASE, _SRV = _start_mock_server()
 os.environ["CUE_API_BASE"] = _BASE
 os.environ["CUE_API_KEY"] = "sk-mock-contract-test"
 
+
+def _stop_module_mock_server() -> None:
+    """Cleanly shut down the module-level mock so the listening socket
+    doesn't leak — otherwise `-W error::ResourceWarning` would fail."""
+    _SRV.shutdown()
+    _SRV.server_close()
+
+
+atexit.register(_stop_module_mock_server)
+
 from cue_api import CueAPIError, capabilities  # noqa: E402
 
 
@@ -280,6 +329,124 @@ class Case5_NoRegressionOnRetry(unittest.TestCase):
         # Mock returns the same payload + same etag both times
         self.assertEqual(body1["_etag"], body2["_etag"])
         self.assertEqual(body1["counts"], body2["counts"])
+
+
+import cue_api as _cue_api_module  # noqa: E402 — needed for search_templates tests
+
+
+class Case6_SearchTemplates(unittest.TestCase):
+    def test_search_templates_keyword_includes_system_and_pagination(self):
+        """search_templates posts {keyword, include_system, page, page_size} and
+        returns unwrapped items list (matching get_templates' unwrap convention)."""
+        captured = {}
+
+        def handler(req):
+            captured["path"] = req.path
+            captured["auth"] = req.headers.get("Authorization")
+            length = int(req.headers.get("Content-Length", "0"))
+            captured["body"] = json.loads(req.rfile.read(length))
+            body = {
+                "data": {
+                    "items": [{"template_id": "t1", "title": "财报分析"}],
+                    "total": 1,
+                    "page": 1,
+                    "page_size": 20,
+                }
+            }
+            req.send_response(200)
+            req.send_header("Content-Type", "application/json")
+            req.end_headers()
+            req.wfile.write(json.dumps(body).encode())
+
+        with mock_server(handler) as base:
+            os.environ["CUE_API_BASE"] = base
+            os.environ["CUE_API_KEY"] = "sk-test"
+            items = _cue_api_module.search_templates(keyword="财报", include_system=True)
+
+        self.assertEqual(captured["path"], "/api/templates/search")
+        self.assertEqual(captured["auth"], "Bearer sk-test")
+        self.assertEqual(
+            captured["body"],
+            {"keyword": "财报", "include_system": True, "page": 1, "page_size": 20},
+        )
+        self.assertEqual(items, [{"template_id": "t1", "title": "财报分析"}])
+
+
+class Case7_Rewrite(unittest.TestCase):
+    def test_rewrite_posts_input_and_returns_mandate(self):
+        """rewrite() posts {input} and returns the full dict with user_confirmation,
+        rewritten_mandate, task_node, safety_flag. device_type is a Header (not body)."""
+        captured = {}
+
+        def handler(req):
+            captured["path"] = req.path
+            captured["auth"] = req.headers.get("Authorization")
+            captured["device_type"] = req.headers.get("device_type")
+            length = int(req.headers.get("Content-Length", "0"))
+            captured["body"] = json.loads(req.rfile.read(length))
+            body = {
+                "_thinking": "...",
+                "user_confirmation": "即将为您调研...",
+                "task_node": {"intent_tag": "尽职调查", "agent_persona": "...",
+                              "target_subject": "...", "search_methodology": "Triangulation"},
+                "rewritten_mandate": "**【调研目标】**...",
+                "safety_flag": {"pii_masked": [], "risk_category": "None"},
+            }
+            req.send_response(200)
+            req.send_header("Content-Type", "application/json")
+            req.end_headers()
+            req.wfile.write(json.dumps(body).encode())
+
+        with mock_server(handler) as base:
+            os.environ["CUE_API_BASE"] = base
+            os.environ["CUE_API_KEY"] = "sk-test"
+            result = _cue_api_module.rewrite(input="帮我查一下宁德时代", device_type="cli")
+        self.assertEqual(captured["path"], "/api/rewrite")
+        self.assertEqual(captured["auth"], "Bearer sk-test")
+        self.assertEqual(captured["device_type"], "cli")
+        self.assertEqual(captured["body"]["input"], "帮我查一下宁德时代")
+        self.assertTrue(result["user_confirmation"].startswith("即将为您调研"))
+        self.assertTrue(result["rewritten_mandate"].startswith("**【调研目标】**"))
+
+
+class Case8_ChatStream(unittest.TestCase):
+    def test_chat_stream_yields_event_data_tuples_from_sse(self):
+        """chat_stream parses lines `event: X\\ndata: Y\\n\\n` into (X, Y) tuples,
+        in order. Headers carry Authorization + Accept: text/event-stream."""
+        captured = {}
+        def handler(req):
+            captured["path"] = req.path
+            captured["auth"] = req.headers.get("Authorization")
+            captured["accept"] = req.headers.get("Accept")
+            length = int(req.headers.get("Content-Length", "0"))
+            captured["body"] = json.loads(req.rfile.read(length))
+            req.send_response(200)
+            req.send_header("Content-Type", "text/event-stream")
+            req.end_headers()
+            sse = (
+                b"event: start_of_agent\n"
+                b'data: {"agent_name":"reporter"}\n\n'
+                b"event: message\n"
+                b'data: {"data":{"delta":{"content":"hi"}}}\n\n'
+                b"event: end_of_agent\n"
+                b'data: {"agent_name":"reporter"}\n\n'
+            )
+            req.wfile.write(sse)
+        with mock_server(handler) as base:
+            os.environ["CUE_API_BASE"] = base
+            os.environ["CUE_API_KEY"] = "sk-test"
+            events = list(_cue_api_module.chat_stream(
+                {"messages": [{"role": "user", "content": "x"}], "conversation_id": "c1",
+                 "chat_id": "ch1", "template_id": "t1", "need_analysis": False,
+                 "need_confirm": False, "need_underlying": False, "need_recommend": False},
+                max_seconds=5,
+            ))
+        self.assertEqual(captured["path"], "/api/chat/stream")
+        self.assertEqual(captured["auth"], "Bearer sk-test")
+        self.assertEqual(captured["accept"], "text/event-stream")
+        self.assertEqual(events[0][0], "start_of_agent")
+        self.assertEqual(events[1], ("message", '{"data":{"delta":{"content":"hi"}}}'))
+        self.assertEqual(events[2][0], "end_of_agent")
 
 
 if __name__ == "__main__":

@@ -18,6 +18,9 @@ Public functions:
   - update_template(template_id, p)    : returns the updated template
   - set_template_frequent(id, bool)    : toggle workbench "frequent" pin
                                          (this is the `+frequent` primitive)
+  - search_templates(keyword, ...)     : keyword search over templates
+  - rewrite(input, device_type)        : POST /api/rewrite — apply rewrite_prompt
+                                         (privacy masking + public-source constraint)
   - generate_template(conv_id, req)    : streams the generated 4 fields
                                          (uses seed: bypass when conv_id
                                          is empty or starts with "seed:")
@@ -237,6 +240,41 @@ def get_template(template_id: str) -> dict:
     if isinstance(data, dict) and "data" in data and isinstance(data["data"], dict):
         return data["data"]
     return data or {}
+
+
+def search_templates(
+    keyword: str,
+    include_system: bool = True,
+    page: int = 1,
+    page_size: int = 20,
+) -> list[dict]:
+    """POST /api/templates/search — keyword search over templates.
+
+    Backend (cubemanus src/api/routes/template.py:753) accepts a
+    TemplateShareRequest with `keyword` (str, stripped server-side),
+    `include_system` (bool), and pagination. The underlying SQL only
+    matches title + primary_category + secondary_category
+    (service/template.py:1823-1825), NOT goal/input — so callers
+    (e.g. cue-research) should treat results as low-confidence candidates,
+    try a few keyword variants, and never auto-select.
+
+    Returns the unwrapped items list (matches get_templates' convention).
+    """
+    body = {
+        "keyword": keyword,
+        "include_system": include_system,
+        "page": page,
+        "page_size": page_size,
+    }
+    data = _request("POST", "/templates/search", body=body)
+    if isinstance(data, dict):
+        payload = data.get("data")
+        if isinstance(payload, dict):
+            return payload.get("items") or []
+        return data.get("items") or []
+    if isinstance(data, list):
+        return data
+    return []
 
 
 # 后端 schema 字段(`src/api/schemas/template.py` CreateTemplateRequest /
@@ -589,6 +627,51 @@ def set_template_frequent(template_id: str, is_frequent: bool = True) -> dict:
     if isinstance(data, dict) and isinstance(data.get("data"), dict):
         return data["data"]
     return data or {}
+
+
+def rewrite(input: str, device_type: str = "cli") -> dict:
+    """POST /api/rewrite — apply rewrite_prompt to a raw user query.
+
+    Backend: cubemanus src/api/routes/rewrite.py:22 → rewrite_service
+    .generate_rewrite_with_profile (src/service/rewrite_service.py:108)
+    applies src/prompts/rewrite_prompt.py with the caller's USER_PROFILE.
+
+    Returns the parsed JSON: keys include `_thinking`, `user_confirmation`
+    (a confirm string to show the user), `task_node` (intent_tag, persona,
+    target, methodology), `rewritten_mandate` (the structured mandate to
+    send to /chat/stream), and `safety_flag` (pii_masked list).
+
+    Used by cue-research's free-form path so privacy masking + public-source
+    constraint + intent amplification apply — chat_stream itself does NOT
+    invoke rewrite_prompt (only this endpoint does).
+
+    `device_type` is a Header, not a body field (see rewrite.py:24).
+    """
+    api_key, base = load_config()
+    url = base.rstrip("/") + "/rewrite"
+    data = json.dumps({"input": input}).encode("utf-8")
+    req = urllib.request.Request(url, data=data, method="POST")
+    req.add_header("Authorization", f"Bearer {api_key}")
+    req.add_header("Content-Type", "application/json")
+    req.add_header("device_type", device_type)
+    try:
+        resp = urllib.request.urlopen(req, timeout=60)
+    except urllib.error.HTTPError as e:
+        try:
+            err_body = e.read().decode("utf-8", errors="replace")
+            try:
+                parsed = json.loads(err_body)
+                detail = parsed.get("detail") if isinstance(parsed.get("detail"), str) else json.dumps(parsed, ensure_ascii=False)
+            except Exception:
+                detail = err_body[:400]
+        except Exception:
+            detail = "(no body)"
+        raise CueAPIError(e.code, detail, "/api/rewrite") from e
+    except urllib.error.URLError as e:
+        reason = getattr(e, "reason", e)
+        raise CueAPIError(0, f"network unreachable: {reason}", "/api/rewrite") from e
+    raw = resp.read().decode("utf-8")
+    return json.loads(raw) if raw else {}
 
 
 # ---------------------------------------------------------------------------
