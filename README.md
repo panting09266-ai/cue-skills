@@ -11,6 +11,7 @@ A **skill** is a portable instruction bundle that any AI agent ([Claude Code](ht
 | Skill | Purpose | Status |
 |---|---|---|
 | [`buddy/`](./buddy) — **cue-buddy** | Lets business experts author, validate, test, tune, and pin-as-frequent [Cue](https://cuecue.cn) "buddy" research templates via natural conversation. No Python / API knowledge needed; the agent talks to the Cue production API on the user's behalf. | v0.1.0 |
+| [`cue-research/`](./cue-research) — **cue-research** | Sibling to cue-buddy for *using* Cue from inside your AI agent: ask a question → skill matches ≤2 candidate buddies (or routes to free-form deep research via `/api/rewrite`) → you confirm credits → it runs → on satisfaction you can distill a free-form run into a saved buddy via cue-buddy. | v0.1.0 |
 
 More skills will be added here as Cue's surface grows.
 
