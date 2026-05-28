@@ -471,6 +471,155 @@ class Case11_TestTemplateChecks(unittest.TestCase):
         self.assertTrue(result.ok, result.detail)
 
 
+class Case12_R10ReportTimeFieldValidator(unittest.TestCase):
+    """R10 validate_template check: 报告时间 field name + format + placeholder.
+
+    Frontend renders by exact key `报告时间`; wrong variants like 报告生成时间 break
+    the FE display. Self-created placeholders like `<由 LLM 填充>` can leak literal
+    text into the published report if the reporter LLM ignores them."""
+
+    def _payload_with_rf(self, rf_body: str) -> dict:
+        """Build a minimally-valid template payload with a custom report_format."""
+        return {
+            "title": "T",
+            "primary_category": "金融",
+            "secondary_category": "预尽调",
+            "input_form_spec": "需提供: [目标_测试_企业] (默认: 通用)。",
+            "goal": "穿透目标企业的公开监管披露,识别影响首批授信批复的偿债、合规与经营风险。",
+            "search_plan": (
+                "**[[主体] 公开身份]**\n"
+                "- **数据路由**: A\n- **执行动作**: B\n- **验证策略**: C\n\n"
+                "**[[财务] 三年财务]**\n"
+                "- **数据路由**: A\n- **执行动作**: B\n- **验证策略**: C\n"
+            ),
+            "report_format": rf_body,
+        }
+
+    def _rf_with_time_line(self, time_line: str = "报告时间: YYYY年MM月DD日") -> str:
+        return (
+            "> **关键配置**\n"
+            "> - **目标对象**: [目标_测试_企业]\n"
+            "> - **报告类型**: 测试\n"
+            "> - **基调设定**: 客观\n"
+            "> - **核心命题**: 测试\n\n"
+            "# [目标_测试_企业] 测试底稿\n"
+            f"{time_line}\n\n"
+            "## 1. 节\n\n"
+            "> **[执行蓝图]**\n"
+            "> - **研究目标**: T\n"
+            "> - **逻辑链条**: T\n"
+            "> - **信息需求**: T\n"
+            "> - **输出形式**: T\n\n"
+            "## 2. 节\n\n"
+            "> **[执行蓝图]**\n"
+            "> - **研究目标**: T\n"
+            "> - **逻辑链条**: T\n"
+            "> - **信息需求**: T\n"
+            "> - **输出形式**: T\n\n"
+            "## 3. 节\n\n"
+            "> **[执行蓝图]**\n"
+            "> - **研究目标**: T\n"
+            "> - **逻辑链条**: T\n"
+            "> - **信息需求**: T\n"
+            "> - **输出形式**: T\n"
+        )
+
+    def test_correct_field_passes(self) -> None:
+        from validate_template import validate
+
+        payload = self._payload_with_rf(self._rf_with_time_line())
+        r10 = [f for f in validate(payload) if "R10" in f.message]
+        self.assertEqual(r10, [], f"unexpected R10 findings: {r10}")
+
+    def test_wrong_name_报告生成时间_errors(self) -> None:
+        from validate_template import validate
+
+        payload = self._payload_with_rf(
+            self._rf_with_time_line("报告生成时间: YYYY年MM月DD日")
+        )
+        errs = [f for f in validate(payload)
+                if f.severity == "error" and "R10" in f.message]
+        self.assertTrue(errs, "should error on 报告生成时间")
+        self.assertTrue(any("报告生成时间" in f.message for f in errs))
+
+    def test_wrong_name_生成日期_errors(self) -> None:
+        from validate_template import validate
+
+        payload = self._payload_with_rf(
+            self._rf_with_time_line("生成日期: YYYY年MM月DD日")
+        )
+        errs = [f for f in validate(payload)
+                if f.severity == "error" and "R10" in f.message]
+        self.assertTrue(errs, "should error on 生成日期")
+
+    def test_self_created_placeholder_errors(self) -> None:
+        from validate_template import validate
+
+        payload = self._payload_with_rf(
+            self._rf_with_time_line("报告时间: <由 LLM 填充>")
+        )
+        errs = [f for f in validate(payload)
+                if f.severity == "error" and "R10" in f.message]
+        self.assertTrue(errs, "should error on <由 LLM 填充> placeholder")
+
+    def test_curly_brace_placeholder_errors(self) -> None:
+        from validate_template import validate
+
+        payload = self._payload_with_rf(
+            self._rf_with_time_line("报告时间: {CURRENT_DATE}")
+        )
+        errs = [f for f in validate(payload)
+                if f.severity == "error" and "R10" in f.message]
+        self.assertTrue(errs, "should error on {CURRENT_DATE} placeholder")
+
+    def test_missing_time_field_warns_not_errors(self) -> None:
+        from validate_template import validate
+
+        rf_no_time = self._rf_with_time_line("").replace("\n\n\n", "\n\n")
+        # strip the empty time_line above
+        payload = self._payload_with_rf(rf_no_time)
+        r10 = [f for f in validate(payload) if "R10" in f.message]
+        self.assertEqual(len(r10), 1, f"expected exactly 1 R10 warning: {r10}")
+        self.assertEqual(r10[0].severity, "warning")
+
+
+class Case13_R10ReportTimeRuntimeCheck(unittest.TestCase):
+    """+test runtime guard: produced report must have a filled 报告时间 line
+    when the template requires one, and must not leak placeholder literals."""
+
+    def test_correct_report_passes(self) -> None:
+        from test_template import _check_report_time_filled
+
+        rf = "# X\n报告时间: YYYY年MM月DD日\n\n## 1. ...\n"
+        report = "# X\n报告时间: 2026年05月28日\n\n## 1. ...\n"
+        result = _check_report_time_filled(rf, report)
+        self.assertTrue(result.ok, result.detail)
+
+    def test_placeholder_leak_fails(self) -> None:
+        from test_template import _check_report_time_filled
+
+        rf = "# X\n报告时间: YYYY年MM月DD日\n\n"
+        report = "# X\n报告时间: <由 LLM 填充>\n\n"
+        result = _check_report_time_filled(rf, report)
+        self.assertFalse(result.ok, "must catch <由 LLM 填充> literal in report")
+
+    def test_missing_line_when_required_fails(self) -> None:
+        from test_template import _check_report_time_filled
+
+        rf = "# X\n报告时间: YYYY年MM月DD日\n\n"
+        report = "# X\n\n## 1. ...\n(no report-time line at all)\n"
+        result = _check_report_time_filled(rf, report)
+        self.assertFalse(result.ok)
+
+    def test_template_no_time_field_skips(self) -> None:
+        from test_template import _check_report_time_filled
+
+        rf = "# X\n\n## 1. ...\n"  # no 报告时间 requirement
+        report = "# X\n\n## 1. ...\n"
+        result = _check_report_time_filled(rf, report)
+        self.assertTrue(result.ok, "must pass when template requires no time field")
+
+
 if __name__ == "__main__":
     # Unbuffered + verbose for skill author workflow.
     unittest.main(verbosity=2)

@@ -685,6 +685,77 @@ def _check_scene_vocab(
         )
 
 
+# R10: 报告时间字段约定 — 前端解析依赖 `报告时间: YYYY年MM月DD日` 字面。
+# 后端 reporter prompt (cubemanus src/prompts/reporter.py:155/170/188 + mimic.py)
+# emits this exact key; 前端按这个 key 渲染。变体如 `报告生成时间` / `生成时间` /
+# `报告日期` / `生成日期` / `生成时刻` 一律不允许。
+_WRONG_TIME_FIELDS = (
+    "报告生成时间", "生成时间", "报告日期", "生成日期", "生成时刻",
+)
+_REPORT_TIME_OK_RE = re.compile(r"(?m)^报告时间\s*[:：]\s*YYYY年MM月DD日\s*$")
+_REPORT_TIME_FUZZY_RE = re.compile(r"(?m)^[>\s]*报告时间\s*[:：]")
+_BAD_TIME_PLACEHOLDER_RE = re.compile(r"<由\s*LLM\s*填充>|<由\s*reporter\s*填|\{CURRENT_DATE\}")
+
+
+def _check_report_time_field(rf: str, out: list[Finding]) -> None:
+    """R10: report_format 必须含 `报告时间: YYYY年MM月DD日` 字面。
+
+    Three failure modes:
+      1. Wrong field name (报告生成时间 / 生成时间 / 报告日期 / 生成日期 / 生成时刻)
+         → error. Frontend renders by exact key `报告时间`; variants get dropped
+         or rendered as plain text.
+      2. Non-standard placeholder (<由 LLM 填充> / <由 reporter 填...> /
+         {CURRENT_DATE}) → error. Reporter LLM recognizes literal
+         `YYYY年MM月DD日` and fills it from {CURRENT_YEAR}/MONTH/DAY; custom
+         placeholders may leak the literal string into the published report.
+      3. Missing entirely → warning. Strongly recommended for FE display.
+    """
+    # (1) wrong variants — error each
+    for wrong in _WRONG_TIME_FIELDS:
+        if wrong in rf:
+            out.append(
+                Finding(
+                    "error",
+                    "report_format",
+                    f"R10: 字段名必须是 `报告时间`,不能是 `{wrong}` — 前端按 `报告时间` "
+                    f"精确解析,变体会让 FE 识别不到时间行(或渲染成普通正文)。"
+                    f"参考 cubemanus reporter.py:155/170/188",
+                )
+            )
+    # (2) bad placeholder
+    if _BAD_TIME_PLACEHOLDER_RE.search(rf):
+        out.append(
+            Finding(
+                "error",
+                "report_format",
+                "R10: 不准用 `<由 LLM 填充>` / `<由 reporter 填...>` / `{CURRENT_DATE}` "
+                "等自创占位符 — 请写字面 `YYYY年MM月DD日`,reporter LLM 自动识别此 "
+                "pattern 并填入北京时间",
+            )
+        )
+    # (3) presence / format
+    if _REPORT_TIME_OK_RE.search(rf):
+        return  # standard form present, all good
+    if _REPORT_TIME_FUZZY_RE.search(rf):
+        out.append(
+            Finding(
+                "error",
+                "report_format",
+                "R10: `报告时间:` 后面必须是字面 `YYYY年MM月DD日` "
+                "(无引用块前缀 `>`、放在主标题正下一行)",
+            )
+        )
+    else:
+        out.append(
+            Finding(
+                "warning",
+                "report_format",
+                "R10: 建议在主标题下一行加 `报告时间: YYYY年MM月DD日` "
+                "(前端依赖此字段渲染报告时间;缺失会显示成空或'未知日期')",
+            )
+        )
+
+
 def validate(payload: dict, scenes: list[str] | None = None) -> list[Finding]:
     """Run all checks on a template payload. Return list of findings.
 
@@ -703,6 +774,7 @@ def validate(payload: dict, scenes: list[str] | None = None) -> list[Finding]:
         _check_search_plan(payload["search_plan"], out)
     if isinstance(payload.get("report_format"), str):
         _check_report_format(payload["report_format"], out)
+        _check_report_time_field(payload["report_format"], out)
     _check_no_tool_names(payload, out)
     _check_no_admission_verdict(payload, out)
     _check_variable_consistency(payload, out)
