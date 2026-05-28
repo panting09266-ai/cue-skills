@@ -19,6 +19,7 @@ Exit 0 = all passed; non-zero = at least one failed (with detail).
 
 from __future__ import annotations
 
+import os
 import re
 import sys
 import unittest
@@ -618,6 +619,239 @@ class Case13_R10ReportTimeRuntimeCheck(unittest.TestCase):
         report = "# X\n\n## 1. ...\n"
         result = _check_report_time_filled(rf, report)
         self.assertTrue(result.ok, "must pass when template requires no time field")
+
+
+class Case14_UpgradeSkillHelpers(unittest.TestCase):
+    """+upgrade verb helpers (update_skill.py): pure-function unit tests.
+
+    Network and git/subprocess paths are excluded — those are exercised
+    end-to-end at agent time, not in stdlib regression. We test the
+    pieces that matter: frontmatter parsing, install-mode detection,
+    skill-arg resolution, cooldown gating, and silent-check orchestration
+    with an injected fetch_fn (no network)."""
+
+    def test_parse_version_from_md_extracts_quoted_version(self) -> None:
+        from update_skill import parse_version_from_md
+        md = '---\nname: x\nmetadata:\n  version: "0.3.1"\n---\n# body\n'
+        self.assertEqual(parse_version_from_md(md), "0.3.1")
+
+    def test_parse_version_from_md_extracts_unquoted_version(self) -> None:
+        from update_skill import parse_version_from_md
+        md = "---\nname: x\nmetadata:\n  version: 1.2.3\n---\n"
+        self.assertEqual(parse_version_from_md(md), "1.2.3")
+
+    def test_parse_version_from_md_missing_returns_none(self) -> None:
+        from update_skill import parse_version_from_md
+        md = "---\nname: x\n---\n# body\n"
+        self.assertIsNone(parse_version_from_md(md))
+
+    def test_parse_version_from_md_no_frontmatter_returns_none(self) -> None:
+        from update_skill import parse_version_from_md
+        self.assertIsNone(parse_version_from_md("# just a body\nfoo\n"))
+
+    def test_detect_install_mode_git_when_dotgit_in_ancestor(self) -> None:
+        import tempfile
+        from update_skill import detect_install_mode
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_p = Path(tmp)
+            (tmp_p / ".git").mkdir()
+            skill_dir = tmp_p / "buddy"
+            skill_dir.mkdir()
+            mode, root = detect_install_mode(skill_dir)
+            self.assertEqual(mode, "git")
+            self.assertEqual(root, tmp_p)
+
+    def test_detect_install_mode_copy_when_no_dotgit(self) -> None:
+        import tempfile
+        from update_skill import detect_install_mode
+        with tempfile.TemporaryDirectory() as tmp:
+            skill_dir = Path(tmp) / "buddy"
+            skill_dir.mkdir()
+            mode, root = detect_install_mode(skill_dir)
+            self.assertEqual(mode, "copy")
+            self.assertIsNone(root)
+
+    def test_resolve_skill_dir_rejects_unknown(self) -> None:
+        from update_skill import _resolve_skill_dir
+        with self.assertRaises(ValueError):
+            _resolve_skill_dir("bogus-skill")
+
+    def test_resolve_skill_dir_accepts_known(self) -> None:
+        from update_skill import _resolve_skill_dir
+        # Should not raise for both known skills.
+        for s in ("buddy", "cue-research"):
+            d = _resolve_skill_dir(s)
+            self.assertTrue(d.name == s)
+
+    def test_cooldown_expired_when_no_record(self) -> None:
+        import tempfile
+        from update_skill import _cooldown_expired
+        with tempfile.TemporaryDirectory() as tmp:
+            p = Path(tmp) / "cooldown.json"
+            self.assertTrue(_cooldown_expired("buddy", now=1000.0,
+                                              cooldown_s=86400, path=p))
+
+    def test_cooldown_not_expired_when_recent(self) -> None:
+        import json as _json
+        import tempfile
+        from update_skill import _cooldown_expired
+        with tempfile.TemporaryDirectory() as tmp:
+            p = Path(tmp) / "cooldown.json"
+            p.write_text(_json.dumps({"buddy": 1000.0}))
+            # 1 hour later, 24h cooldown → still cooling down.
+            self.assertFalse(_cooldown_expired("buddy", now=1000.0 + 3600,
+                                                cooldown_s=86400, path=p))
+
+    def test_cooldown_expired_when_old(self) -> None:
+        import json as _json
+        import tempfile
+        from update_skill import _cooldown_expired
+        with tempfile.TemporaryDirectory() as tmp:
+            p = Path(tmp) / "cooldown.json"
+            p.write_text(_json.dumps({"buddy": 1000.0}))
+            # 25h later → expired.
+            self.assertTrue(_cooldown_expired("buddy", now=1000.0 + 25 * 3600,
+                                               cooldown_s=86400, path=p))
+
+    def test_silent_check_skips_when_cooldown_fresh(self) -> None:
+        """Cooldown gate short-circuits before any network attempt."""
+        import json as _json
+        import tempfile
+        from update_skill import silent_check_for_update
+        with tempfile.TemporaryDirectory() as tmp:
+            p = Path(tmp) / "cooldown.json"
+            p.write_text(_json.dumps({"buddy": 1000.0}))
+            calls = []
+            def boom_fetch(skill):
+                calls.append(skill)
+                return "9.9.9"
+            rc = silent_check_for_update(
+                skill="buddy", now=1000.0 + 60,
+                cooldown_path=p, fetch_fn=boom_fetch,
+            )
+            self.assertEqual(rc, 0)
+            self.assertEqual(calls, [], "fetch_fn must NOT be called when cooldown is fresh")
+
+    def test_silent_check_writes_cooldown_after_successful_fetch(self) -> None:
+        """After a successful version fetch the cooldown timestamp persists."""
+        import json as _json
+        import tempfile
+        from update_skill import silent_check_for_update
+        with tempfile.TemporaryDirectory() as tmp:
+            p = Path(tmp) / "cooldown.json"
+            # Inject a fetch that returns the same version as local — so no
+            # nudge, but the timestamp should still get written.
+            local_md = (Path(__file__).resolve().parents[1] / "SKILL.md")
+            from update_skill import parse_version_from_md
+            local_v = parse_version_from_md(local_md.read_text(encoding="utf-8"))
+            rc = silent_check_for_update(
+                skill="buddy", now=2000.0,
+                cooldown_path=p, fetch_fn=lambda s: local_v,
+            )
+            self.assertEqual(rc, 0)
+            data = _json.loads(p.read_text())
+            self.assertEqual(data.get("buddy"), 2000.0)
+
+    def test_silent_check_does_not_write_cooldown_on_network_failure(self) -> None:
+        """If fetch returns None (network down), cooldown stays untouched so
+        the next session retries instead of going silent for 24h."""
+        import tempfile
+        from update_skill import silent_check_for_update
+        with tempfile.TemporaryDirectory() as tmp:
+            p = Path(tmp) / "cooldown.json"
+            rc = silent_check_for_update(
+                skill="buddy", now=3000.0,
+                cooldown_path=p, fetch_fn=lambda s: None,
+            )
+            self.assertEqual(rc, 0)
+            self.assertFalse(p.exists(), "cooldown file must not be written on net failure")
+
+    def test_is_local_behind_strict_semver(self) -> None:
+        """Comparator must only fire when local < remote (semver tuple).
+        Local-ahead developer cases must NOT trigger nudge."""
+        from update_skill import is_local_behind
+        # local strictly older → behind
+        self.assertTrue(is_local_behind("0.1.0", "0.2.0"))
+        self.assertTrue(is_local_behind("0.1.0", "0.1.1"))
+        self.assertTrue(is_local_behind("0.1.0", "1.0.0"))
+        # same → not behind
+        self.assertFalse(is_local_behind("0.2.0", "0.2.0"))
+        # local ahead (developer WIP) → must NOT be considered behind
+        self.assertFalse(is_local_behind("0.2.0", "0.1.0"))
+        self.assertFalse(is_local_behind("1.0.0", "0.99.0"))
+        # missing values → False (don't nudge on unknowns)
+        self.assertFalse(is_local_behind(None, "0.2.0"))
+        self.assertFalse(is_local_behind("0.1.0", None))
+        self.assertFalse(is_local_behind(None, None))
+
+    def test_is_local_behind_non_semver_fallback(self) -> None:
+        """Non-semver strings can't be tuple-compared; fall back to inequality."""
+        from update_skill import is_local_behind
+        # both non-semver, differ → conservative: behind
+        self.assertTrue(is_local_behind("v1-beta", "v1-rc"))
+        # same non-semver → not behind
+        self.assertFalse(is_local_behind("v1-beta", "v1-beta"))
+
+
+class Case15_UpgradeGitBranchGuard(unittest.TestCase):
+    """+upgrade git mode must refuse to run unless the user is on the target
+    branch and not in detached HEAD. Wrong-branch pull semantics would either
+    silently no-op or fail ff-only on diverged history (codex review Block C).
+    """
+
+    def _init_repo(self, tmp: Path) -> None:
+        """Initialize a tiny git repo with one commit on `main`."""
+        import subprocess
+        env = {"GIT_AUTHOR_NAME": "T", "GIT_AUTHOR_EMAIL": "t@t",
+               "GIT_COMMITTER_NAME": "T", "GIT_COMMITTER_EMAIL": "t@t",
+               "PATH": os.environ.get("PATH", "")}
+        subprocess.run(["git", "init", "-q", "-b", "main", str(tmp)],
+                       check=True, env=env)
+        (tmp / "file.txt").write_text("hi")
+        subprocess.run(["git", "-C", str(tmp), "add", "."],
+                       check=True, env=env)
+        subprocess.run(["git", "-C", str(tmp), "commit", "-q", "-m", "init"],
+                       check=True, env=env)
+
+    def test_current_branch_returns_main_after_init(self) -> None:
+        import tempfile
+        from update_skill import git_current_branch
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_p = Path(tmp)
+            self._init_repo(tmp_p)
+            self.assertEqual(git_current_branch(tmp_p), "main")
+
+    def test_current_branch_returns_none_on_detached_head(self) -> None:
+        import tempfile
+        import subprocess
+        from update_skill import git_current_branch
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_p = Path(tmp)
+            self._init_repo(tmp_p)
+            # Detach by checking out the commit SHA directly.
+            sha = subprocess.run(
+                ["git", "-C", str(tmp_p), "rev-parse", "HEAD"],
+                capture_output=True, text=True, check=True,
+            ).stdout.strip()
+            subprocess.run(
+                ["git", "-C", str(tmp_p), "checkout", "-q", sha],
+                check=True,
+                env={**os.environ, "GIT_AUTHOR_NAME": "T", "GIT_AUTHOR_EMAIL": "t@t"},
+            )
+            self.assertIsNone(git_current_branch(tmp_p))
+
+    def test_current_branch_returns_feature_when_on_feature(self) -> None:
+        import tempfile
+        import subprocess
+        from update_skill import git_current_branch
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_p = Path(tmp)
+            self._init_repo(tmp_p)
+            subprocess.run(
+                ["git", "-C", str(tmp_p), "checkout", "-q", "-b", "feature/x"],
+                check=True,
+            )
+            self.assertEqual(git_current_branch(tmp_p), "feature/x")
 
 
 if __name__ == "__main__":

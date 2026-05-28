@@ -3,7 +3,7 @@ name: cue-research
 description: "Use when the user asks a research question they want Cue to answer. Triggers: 帮我查/调研/研究 + 主体或话题; ask Cue about X; 用 Cue 跑一下 Y. Matches ≤2 candidate buddies from the user's library (or falls back to free-form deep research with backend rewrite), confirms credits, runs, and offers to distill a successful free-form run into a saved buddy. Public-data scope only — refuse for private-data scenarios (real AML / medical / internal accounting)."
 license: MIT
 metadata:
-  version: "0.1.0"
+  version: "0.2.0"
   requires:
     bins: ["python3"]
     envOptional: ["CUE_API_KEY", "CUE_API_BASE"]
@@ -32,6 +32,7 @@ Cue 工具面仅含**公开数据源**(工商/司法/监管/财报/资金流/招
 | `+match <问题>` | 只匹配候选搭子，不跑 | 否 |
 | `+rewrite <问题>` | 只调 /api/rewrite 看 user_confirmation + rewritten_mandate，不跑 | 否 |
 | `+save <conversation_id>` | 把一次成功的 free-form 跑沉淀为搭子(handoff 给 cue-buddy 的 +author/+create) | 否(模板生成本身不消耗，跑测试才会) |
+| `+upgrade` | 检查并(经确认后)升级 skill 自身到 GitHub `main` 最新版。git clone 装的走 `git pull --ff-only`,copy 装的给手动指引。session 启动时 agent 应 silent 跑 `update_skill.py --silent-check --skill cue-research`(24h 冷却,落后时只在 stderr 打一行,不弹问) | 否 |
 
 ## 决策树
 
@@ -43,6 +44,7 @@ Cue 工具面仅含**公开数据源**(工商/司法/监管/财报/资金流/招
 "看看哪个搭子能查 X"(只匹配不跑)                                       → +match
 "先帮我把这个问题改写成结构化的(不跑)"                                 → +rewrite
 "把刚才那次调研存成搭子" / "save this run as a buddy"                  → +save
+"更新一下 skill" / "check for updates" / "升级搭子工具本身"            → +upgrade
 ─────────────────────────────────────────────────────────────────────────
 ```
 
@@ -171,6 +173,7 @@ Stage 5 满意且是 4b 自由式跑时,问:
 | `+match` | 只跑 Stage 2-3 | `cue_api.search_templates` |
 | `+rewrite` | 只跑 /api/rewrite | `cue_api.rewrite` |
 | `+save` | Stage 6 handoff | 交给 cue-buddy 的 `generate_template` + `validate_template` + `cue_api.create_template` |
+| `+upgrade` | 升级 skill 自身 | `python3 ../buddy/scripts/update_skill.py --skill cue-research`(交互式) / 加 `--silent-check`(session 启动轻量版) |
 
 本 skill 自己**没有专用脚本**——所有原语都在 `../buddy/scripts/` 里(共享)。`cue-research/scripts/test_skill_regression.py` 只做结构/import 自检。
 

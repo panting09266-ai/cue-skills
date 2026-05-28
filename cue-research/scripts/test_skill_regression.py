@@ -44,6 +44,7 @@ class TestSkillMd(unittest.TestCase):
         self.assertIn("match", verbs)
         self.assertIn("rewrite", verbs)
         self.assertIn("save", verbs)
+        self.assertIn("upgrade", verbs)  # skill self-upgrade (not +update)
 
     def test_freeform_path_mentions_rewrite_endpoint(self):
         # Codex Block C fix: free-form path must call /api/rewrite first

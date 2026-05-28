@@ -3,7 +3,7 @@ name: cue-buddy
 description: "Use when the user wants to author / validate / debug / pin-as-frequent a Cue 搭子(buddy) research template (corporate-credit pre-diligence, public-record compliance snapshot, earnings review, gov-procurement lead scan, private-fund DD, etc.) via natural conversation. Triggers: 创建搭子 / 做一个 X 搭子 / 调试模板 / 测试我的搭子 / 提交模板 / 设为常用 / 钉到工作台首页 / design a buddy for X / mark template as frequent. Cubemanus public-data tool surface only — refuse for private-data scenarios (real AML / medical diagnosis / internal accounting)."
 license: MIT
 metadata:
-  version: "0.1.0"
+  version: "0.2.0"
   requires:
     bins: ["python3"]
     envOptional: ["CUE_API_KEY", "CUE_API_BASE"]
@@ -99,8 +99,11 @@ export CUE_API_KEY=sk...
 | `+tune <template_id> --issues <path>` | 基于当前内容 + 问题清单让 LLM 优化模板（走 seed: bypass 路径），含 diff 预览与人工确认 | **是**（粗略 2-6 credits 起步） | `POST /api/generate_template` + `PUT /api/templates/<id>` |
 | `+frequent <template_id>` | 把模板设为"常用",钉到 cuecue.cn 工作台首页"常用"区 | 否 | `POST /api/templates/frequent` |
 | `+unfrequent <template_id>` | 取消"常用",从首页"常用"区移除 | 否 | `POST /api/templates/frequent` (`is_frequent=false`) |
+| `+upgrade` | 检查并(经确认后)升级 skill 自身到 GitHub `main` 最新版。git clone 装的走 `git pull --ff-only`,copy 装的给手动指引;本地有未提交改动则 abort 不强覆盖。**注意:跟 `+update <template_id>`(改模板)语义完全不同** | 否 | (GitHub raw + `git pull`,**本地操作**) |
 
-**全部已上线 verb**：`+author / +capabilities / +validate / +create / +list / +get / +update / +test / +tune / +frequent / +unfrequent`。
+**全部已上线 verb**:`+author / +capabilities / +validate / +create / +list / +get / +update / +test / +tune / +frequent / +unfrequent / +upgrade`。
+
+**`+upgrade` 与 session 启动 silent-check**:agent 加载本 SKILL.md 时,**建议**在跑任何 verb 前先 silent 跑一次:`python3 buddy/scripts/update_skill.py --silent-check`。这是带 24h 冷却的轻量版本对比,落后时只在 stderr 打一行 `ℹ️ cue-skills/buddy 有新版可用 vX → vY,运行 +upgrade 升级`,**不弹问、不阻塞、不自动 pull**。网络失败时静默跳过(下次再试)。冷却 timestamp 存 `~/.cue/last-update-check.json`。
 
 **关于 `+frequent` 不叫 `+publish`**:Cue 当前没有"跨用户发布"原语;`+frequent` 实际就是把模板钉到调用者自己工作台首页"常用"区(`is_frequent=true`)方便高频访问。早期文档曾用 `+publish` 命名容易让用户误以为是对外发布——已统一改名为 `+frequent`。"对外分享"能力须走 cuecue.cn 网页端的分享/复制链路。
 
@@ -126,6 +129,9 @@ export CUE_API_KEY=sk...
 "自动优化 tpl_xxx" / "根据问题改一下" / "tune this" / "调优"      → +tune
 "设为常用 tpl_xxx" / "钉到首页" / "mark frequent" / "pin to home"  → +frequent
 "取消常用 tpl_xxx" / "从首页摘掉" / "unpin" / "unfrequent"         → +unfrequent
+
+"升级 skill" / "更新 cue-skills" / "更新 cue-buddy" / "check for skill updates" / "拉一下最新版" → +upgrade
+(注意:"改 tpl_xxx" / "更新模板 X" 等带 template_id 的语义走 `+update <id>`,**不是** `+upgrade`)
 ──────────────────────────────────────────────────────────────────────────
 ```
 
@@ -272,5 +278,6 @@ agent 不需要"硬编码"如何执行 verb——直接调用脚本即可：
 | `+tune <id> --issues f` | `tune_template.py` | `python3 scripts/tune_template.py <id> --issues issues.txt` |
 | `+frequent <id>` | `cue_api.py` | `python3 scripts/cue_api.py frequent <id>` |
 | `+unfrequent <id>` | `cue_api.py` | `python3 scripts/cue_api.py unfrequent <id>` |
+| `+upgrade` | `update_skill.py` | `python3 scripts/update_skill.py --skill buddy`(交互);`--silent-check` 走 session-start 轻量版 |
 
 `+author` 没有专用脚本——它就是 agent 用 SKILL.md 的引导问答 + `validate_template.py` 反馈 + `cue_api.create_template` 落库的一个流程。
