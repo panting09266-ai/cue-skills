@@ -153,6 +153,6 @@ buddy/
 ## Contributing
 
 Issues and PRs welcome. Especially valuable:
-- New `references/examples/<scenario>.md` covering domain templates (earnings-review, private-fund DD, public-record compliance snapshot, gov-procurement lead scan, policy-watch, sector-tracking, etc.) — scope should align with Cue's actual tool surface (finance / 工商 / 司法 / 监管 / 资金流 / 行业研报 / 政府采购),avoid scenarios requiring private data (e.g. real AML on bank-internal transactions, medical diagnosis)
+- New `references/examples/<scenario>.md` covering domain templates not yet shipped (private-fund DD, public-record compliance snapshot, gov-procurement lead scan, policy-watch, sector-tracking, etc. — `corporate-credit.md` and `earnings-review.md` are already in the repo) — scope should align with Cue's actual tool surface (finance / 工商 / 司法 / 监管 / 资金流 / 行业研报 / 政府采购),avoid scenarios requiring private data (e.g. real AML on bank-internal transactions, medical diagnosis)
 - Cross-agent verification reports (Codex / Gemini / OpenClaw)
 - Hard-rule additions backed by failure-mode evidence
