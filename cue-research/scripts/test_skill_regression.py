@@ -46,13 +46,46 @@ class TestSkillMd(unittest.TestCase):
         self.assertIn("save", verbs)
 
     def test_freeform_path_mentions_rewrite_endpoint(self):
-        # Codex Block C fix: free-form path must call /api/rewrite first.
+        # Codex Block C fix: free-form path must call /api/rewrite first
+        # AND disable backend need_analysis. Accept any of: kwarg form
+        # `need_analysis=False`, dict form `"need_analysis": False`, or
+        # JSON form `'need_analysis': false` — what matters is the intent,
+        # not the syntax.
         self.assertIn("/api/rewrite", self.md)
-        self.assertIn("need_analysis=False", self.md)
+        self.assertRegex(
+            self.md,
+            r'["\']?need_analysis["\']?\s*[=:]\s*["\']?\s*[Ff]alse\b',
+            "SKILL.md must show need_analysis being set to False (any syntax)",
+        )
 
     def test_never_autoselects_buddy_hard_rule(self):
         # Codex Block B fix: matching is low-confidence, never auto-pick.
         self.assertRegex(self.md, r"不自动选搭子|never auto-?select")
+
+    def test_no_delete_verb_in_verb_table(self):
+        # Hard rule 5: skill must not DECLARE +delete in the verb table.
+        # Scoped to verb-table row form `| `+delete`` so the hard-rule prose
+        # ("**不实现 `+delete`**") explaining WHY we don't have it is allowed.
+        self.assertNotRegex(
+            self.md, r"\|\s*`\+delete`",
+            "SKILL.md verb table must not declare +delete — deletion is web-only",
+        )
+
+    def test_credit_confirmation_hard_rule_present(self):
+        # Hard rule 2: every real run must explicitly confirm credits.
+        self.assertRegex(
+            self.md, r"确认\s*credits|confirm credits",
+            "SKILL.md hard rules must mention credit confirmation",
+        )
+
+    def test_no_client_side_rewrite_reimpl_rule_present(self):
+        # Hard rule 4: don't reimplement backend rewrite logic in the agent.
+        # Look for either a Chinese phrasing or an English one.
+        self.assertRegex(
+            self.md,
+            r"不在 agent 侧重写|不重写深研逻辑|don'?t (?:re-?implement|reimplement) (?:the )?rewrite",
+            "SKILL.md must forbid client-side rewrite reimplementation",
+        )
 
 
 class TestSharedScriptImports(unittest.TestCase):

@@ -80,15 +80,46 @@ agent 从用户提问里抽：
 
 ### Stage 4a: 用户选 1/2 — 跑搭子
 
-调 `chat_stream(template_id=<选中>, messages=[{role:user, content:<原问题或澄清后问题>}], need_analysis=False, need_confirm=False, need_underlying=False, need_recommend=False)`。复用 `sse_report.extract_reporter_content` + `diagnose_empty_report` + replay 兜底。
+`chat_stream` 的真实签名是 `chat_stream(payload: dict, ...)`——**一个 payload dict,不是 kwargs**。构造方式:
+
+```python
+import uuid
+payload = {
+    "messages": [{"role": "user", "content": <原问题或澄清后问题>}],
+    "conversation_id": f"cue-research-{uuid.uuid4().hex[:12]}",  # 状态持久化需要 conv id
+    "chat_id": uuid.uuid4().hex,
+    "template_id": <选中的 template_id>,
+    "need_analysis": False,   # 关键:别让后端中断流去澄清表单
+    "need_confirm": False,
+    "need_underlying": False,
+    "need_recommend": False,
+}
+for event, data in chat_stream(payload, max_seconds=900):
+    ...  # 累 reporter content; 见 sse_report.extract_reporter_content
+```
+
+复用 `sse_report.extract_reporter_content` 累报告;空报告时用 `diagnose_empty_report` 分类原因,`stream_cut_before_reporter` 走 `replay(conversation_id)` 兜底。这一套硬化逻辑在 `buddy/scripts/test_template.py` 已经验证过 4 个真实主体,直接照抄它的事件循环即可。
 
 ### Stage 4b: 用户选 0 — 自由式深度调研(经过 /api/rewrite)
 
-1. 先调 `rewrite(input=<用户问题>)`，拿到 `user_confirmation` + `rewritten_mandate`。
-2. 展示 `user_confirmation` 给用户(它会说明：要从什么视角调研、脱敏了哪些隐私)，并允许用户微调或确认。
-3. 用户确认后，把 `rewritten_mandate` 作为 user message 发给 `chat_stream`(**无 template_id**，need_analysis=False)。
+1. 先调 `rewrite(input=<用户问题>)`(已自动 unwrap DataResponse 包装),拿到 dict,顶层就是 `thinking / user_confirmation / task_node / rewritten_mandate / safety_flag`。
+2. 展示 `user_confirmation`(它会说明:要从什么视角调研、脱敏了哪些隐私)+ `safety_flag.pii_masked` 列表,允许用户微调或确认。
+3. 用户确认后,把 `rewritten_mandate` 作为 user message 发给 `chat_stream`,**payload 不带 `template_id`**:
 
-**为什么必须先 rewrite？** chat_stream 本身不调用 rewrite_prompt(只有 /api/rewrite 这个独立端点会)。跳过会丢掉隐私脱敏 + 公开信源约束 + 意图增强。
+```python
+payload = {
+    "messages": [{"role": "user", "content": rewrite_result["rewritten_mandate"]}],
+    "conversation_id": f"cue-research-{uuid.uuid4().hex[:12]}",
+    "chat_id": uuid.uuid4().hex,
+    # 不放 template_id — 自由式走 deepresearch_team
+    "need_analysis": False,
+    "need_confirm": False,
+    "need_underlying": False,
+    "need_recommend": False,
+}
+```
+
+**为什么必须先 rewrite?** chat_stream 本身不调用 rewrite_prompt(只有 /api/rewrite 这个独立端点会)。跳过会丢掉隐私脱敏 + 公开信源约束 + 意图增强。
 
 ### Stage 5: 交付 + 满意度
 
@@ -126,6 +157,22 @@ agent 从用户提问里抽：
 | `+save` | Stage 6 handoff | 交给 cue-buddy 的 `generate_template` + `validate_template` + `cue_api.create_template` |
 
 本 skill 自己**没有专用脚本**——所有原语都在 `../buddy/scripts/` 里(共享)。`cue-research/scripts/test_skill_regression.py` 只做结构/import 自检。
+
+### 导入约定(运行时 bootstrap)
+
+agent 在 cue-research 上下文里跑 Python 调上面这些函数时,`cue_api` 和 `sse_report` 不在默认 import 路径(它们在 sibling 的 `buddy/scripts/`)。每段 Python 起手:
+
+```python
+import sys
+from pathlib import Path
+# cue-research/<...>  →  cue-skills/buddy/scripts
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "buddy" / "scripts"))
+
+from cue_api import search_templates, rewrite, chat_stream, replay
+from sse_report import extract_reporter_content, diagnose_empty_report
+```
+
+如果是 agent 直接通过 Bash 跑 `python3 -c "..."`,改成绝对路径:`sys.path.insert(0, "<repo>/buddy/scripts")`。规避点:不要在 cue-research/ 下复制粘贴 `cue_api.py`——会跟 cue-buddy 的版本漂移。
 
 ## 兼容性
 
