@@ -4,6 +4,8 @@
 
 > An AI-agent skill that lets business experts author, validate, test, and pin-as-frequent [Cue](https://cuecue.cn) "buddy" templates — without writing code.
 
+> **Sibling skill:** [`cue-research`](../cue-research) — for *using* buddies (ask → match → confirm → run → optionally save as a buddy) from inside your AI agent. cue-buddy is the *author* tool; cue-research is the *use* tool.
+
 ## What is Cue / What is a buddy
 
 [Cue](https://cuecue.cn) is a **Deep Research Agent + Intelligence Sentinel** platform built for high-precision finance and business workflows. Cue picks the right tools from **300+ professional data sources** — A-share / HK / US equity disclosures, fund AMAC registries, business registries, court records, regulatory feeds, sell-side research, capital flow data — cross-validates findings across sources, and produces structured, **source-cited** reports in minutes instead of hours. Every conclusion links back to its origin; nothing is fabricated.

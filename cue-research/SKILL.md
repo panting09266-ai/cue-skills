@@ -103,8 +103,12 @@ for event, data in chat_stream(payload, max_seconds=900):
 ### Stage 4b: 用户选 0 — 自由式深度调研(经过 /api/rewrite)
 
 1. 先调 `rewrite(input=<用户问题>)`(已自动 unwrap DataResponse 包装),拿到 dict,顶层就是 `thinking / user_confirmation / task_node / rewritten_mandate / safety_flag`。
-2. 展示 `user_confirmation`(它会说明:要从什么视角调研、脱敏了哪些隐私)+ `safety_flag.pii_masked` 列表,允许用户微调或确认。
-3. 用户确认后,把 `rewritten_mandate` 作为 user message 发给 `chat_stream`,**payload 不带 `template_id`**:
+2. 展示 `user_confirmation`(它会说明:要从什么视角调研、脱敏了哪些隐私)+ `safety_flag.pii_masked` 列表,问:
+   > 这样调研行吗?
+   > 1. 按此跑
+   > 2. 我要改一下 query 重 rewrite
+   > 3. 取消
+3. 用户选 1,把 `rewritten_mandate` 作为 user message 发给 `chat_stream`,**payload 不带 `template_id`**(选 2 回到 Stage 1 拿新 query 重走;选 3 退出):
 
 ```python
 payload = {
@@ -123,17 +127,29 @@ payload = {
 
 ### Stage 5: 交付 + 满意度
 
-展示报告(reporter content)。问：
-- ✅ 满意 → 若是 4b 自由式跑，提示"是否把这次调研沉淀成搭子模板？(走 cue-buddy +save 流)"
-- ❌ 不满意 → 提供下一步：换另一个候选搭子重跑 / 补充澄清后重跑 / 改用自由式
+展示报告(reporter content)。问:
+> 这份报告满意吗?
+> 1. 满意
+> 2. 不满意
+
+- 用户选 **1 (满意)** → 若刚才是 4b 自由式跑,转 Stage 6;若是 4a 搭子跑,直接结束。
+- 用户选 **2 (不满意)** → 给后续选项,继续 1/2/3 风格:
+  > 1. 换另一个候选搭子重跑(若 Stage 3 有多个候选还没用过)
+  > 2. 补充澄清后重跑(回 Stage 1 改 query / 改主体 / 改时间窗)
+  > 3. 改路径重跑(刚才是搭子 → 改自由式;刚才是自由式 → 改搭子,回 Stage 2 再匹配)
 
 ### Stage 6: 沉淀为搭子(可选 handoff 给 cue-buddy)
 
-用户确认沉淀后：
+Stage 5 满意且是 4b 自由式跑时,问:
+> 是否把这次调研沉淀成搭子模板?(下次同类问题就有搭子直接用)
+> 1. 沉淀(handoff 给 cue-buddy 的 +author / +validate / 人工确认 +create)
+> 2. 不沉淀
+
+用户选 **1** 后:
 - 把成功跑的 `conversation_id` + 原问题 + reporter 报告交给 cue-buddy。
-- 触发 cue-buddy 的 `+author` 流(generate_template 用 `template_history_by_conversation_id(conversation_id)` 真的能拿到本次跑的历史，详见 cubemanus template.py:226-259)。
+- 触发 cue-buddy 的 `+author` 流(generate_template 用 `template_history_by_conversation_id(conversation_id)` 真的能拿到本次跑的历史,详见 cubemanus template.py:226-259)。
 - 走 cue-buddy 的 `+validate` → `+create` 落库。
-- 这是**显式的、用户确认的**一步，不自动。
+- 这是**显式的、用户确认的**一步,不自动。
 
 ## Hard rules(铁律)
 
