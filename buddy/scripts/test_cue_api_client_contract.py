@@ -360,6 +360,43 @@ class Case6_SearchTemplates(unittest.TestCase):
         self.assertEqual(items, [{"template_id": "t1", "title": "财报分析"}])
 
 
+class Case7_Rewrite(unittest.TestCase):
+    def test_rewrite_posts_input_and_returns_mandate(self):
+        """rewrite() posts {input} and returns the full dict with user_confirmation,
+        rewritten_mandate, task_node, safety_flag. device_type is a Header (not body)."""
+        captured = {}
+
+        def handler(req):
+            captured["path"] = req.path
+            captured["auth"] = req.headers.get("Authorization")
+            captured["device_type"] = req.headers.get("device_type")
+            length = int(req.headers.get("Content-Length", "0"))
+            captured["body"] = json.loads(req.rfile.read(length))
+            body = {
+                "_thinking": "...",
+                "user_confirmation": "即将为您调研...",
+                "task_node": {"intent_tag": "尽职调查", "agent_persona": "...",
+                              "target_subject": "...", "search_methodology": "Triangulation"},
+                "rewritten_mandate": "**【调研目标】**...",
+                "safety_flag": {"pii_masked": [], "risk_category": "None"},
+            }
+            req.send_response(200)
+            req.send_header("Content-Type", "application/json")
+            req.end_headers()
+            req.wfile.write(json.dumps(body).encode())
+
+        with mock_server(handler) as base:
+            os.environ["CUE_API_BASE"] = base
+            os.environ["CUE_API_KEY"] = "sk-test"
+            result = _cue_api_module.rewrite(input="帮我查一下宁德时代", device_type="cli")
+        self.assertEqual(captured["path"], "/api/rewrite")
+        self.assertEqual(captured["auth"], "Bearer sk-test")
+        self.assertEqual(captured["device_type"], "cli")
+        self.assertEqual(captured["body"]["input"], "帮我查一下宁德时代")
+        self.assertTrue(result["user_confirmation"].startswith("即将为您调研"))
+        self.assertTrue(result["rewritten_mandate"].startswith("**【调研目标】**"))
+
+
 if __name__ == "__main__":
     try:
         unittest.main(verbosity=2)
