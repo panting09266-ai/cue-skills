@@ -17,6 +17,10 @@ Notes:
     - Each invocation consumes Cue credits (typical 5-15 per run).
     - The script asks for explicit confirmation before starting.
     - No deletion / publishing / sensitive actions — read-only test.
+    - The query sent is a synthetic validation prompt ("请基于公开信息研究 <entity>")
+      with need_analysis off. This run is for VALIDATION only — do NOT publish it as
+      a user-facing playbook demo replay. A demo replay should use a realistic user
+      query and is published separately (cuecue.cn web share), not by this script.
 """
 
 from __future__ import annotations
