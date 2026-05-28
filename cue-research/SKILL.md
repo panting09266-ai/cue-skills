@@ -3,7 +3,7 @@ name: cue-research
 description: "Use when the user asks a research question they want Cue to answer. Triggers: 帮我查/调研/研究 + 主体或话题; ask Cue about X; 用 Cue 跑一下 Y. Matches ≤2 candidate buddies from the user's library (or falls back to free-form deep research with backend rewrite), confirms credits, runs, and offers to distill a successful free-form run into a saved buddy. Public-data scope only — refuse for private-data scenarios (real AML / medical / internal accounting)."
 license: MIT
 metadata:
-  version: "0.1.0"
+  version: "0.2.0"
   requires:
     bins: ["python3"]
     envOptional: ["CUE_API_KEY", "CUE_API_BASE"]
@@ -173,7 +173,7 @@ Stage 5 满意且是 4b 自由式跑时,问:
 | `+match` | 只跑 Stage 2-3 | `cue_api.search_templates` |
 | `+rewrite` | 只跑 /api/rewrite | `cue_api.rewrite` |
 | `+save` | Stage 6 handoff | 交给 cue-buddy 的 `generate_template` + `validate_template` + `cue_api.create_template` |
-| `+upgrade` | 升级 skill 自身 | `update_skill.py`(交互式) / `update_skill.py --silent-check`(session 启动轻量版) |
+| `+upgrade` | 升级 skill 自身 | `python3 ../buddy/scripts/update_skill.py --skill cue-research`(交互式) / 加 `--silent-check`(session 启动轻量版) |
 
 本 skill 自己**没有专用脚本**——所有原语都在 `../buddy/scripts/` 里(共享)。`cue-research/scripts/test_skill_regression.py` 只做结构/import 自检。
 

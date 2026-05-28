@@ -19,6 +19,7 @@ Exit 0 = all passed; non-zero = at least one failed (with detail).
 
 from __future__ import annotations
 
+import os
 import re
 import sys
 import unittest
@@ -764,6 +765,93 @@ class Case14_UpgradeSkillHelpers(unittest.TestCase):
             )
             self.assertEqual(rc, 0)
             self.assertFalse(p.exists(), "cooldown file must not be written on net failure")
+
+    def test_is_local_behind_strict_semver(self) -> None:
+        """Comparator must only fire when local < remote (semver tuple).
+        Local-ahead developer cases must NOT trigger nudge."""
+        from update_skill import is_local_behind
+        # local strictly older → behind
+        self.assertTrue(is_local_behind("0.1.0", "0.2.0"))
+        self.assertTrue(is_local_behind("0.1.0", "0.1.1"))
+        self.assertTrue(is_local_behind("0.1.0", "1.0.0"))
+        # same → not behind
+        self.assertFalse(is_local_behind("0.2.0", "0.2.0"))
+        # local ahead (developer WIP) → must NOT be considered behind
+        self.assertFalse(is_local_behind("0.2.0", "0.1.0"))
+        self.assertFalse(is_local_behind("1.0.0", "0.99.0"))
+        # missing values → False (don't nudge on unknowns)
+        self.assertFalse(is_local_behind(None, "0.2.0"))
+        self.assertFalse(is_local_behind("0.1.0", None))
+        self.assertFalse(is_local_behind(None, None))
+
+    def test_is_local_behind_non_semver_fallback(self) -> None:
+        """Non-semver strings can't be tuple-compared; fall back to inequality."""
+        from update_skill import is_local_behind
+        # both non-semver, differ → conservative: behind
+        self.assertTrue(is_local_behind("v1-beta", "v1-rc"))
+        # same non-semver → not behind
+        self.assertFalse(is_local_behind("v1-beta", "v1-beta"))
+
+
+class Case15_UpgradeGitBranchGuard(unittest.TestCase):
+    """+upgrade git mode must refuse to run unless the user is on the target
+    branch and not in detached HEAD. Wrong-branch pull semantics would either
+    silently no-op or fail ff-only on diverged history (codex review Block C).
+    """
+
+    def _init_repo(self, tmp: Path) -> None:
+        """Initialize a tiny git repo with one commit on `main`."""
+        import subprocess
+        env = {"GIT_AUTHOR_NAME": "T", "GIT_AUTHOR_EMAIL": "t@t",
+               "GIT_COMMITTER_NAME": "T", "GIT_COMMITTER_EMAIL": "t@t",
+               "PATH": os.environ.get("PATH", "")}
+        subprocess.run(["git", "init", "-q", "-b", "main", str(tmp)],
+                       check=True, env=env)
+        (tmp / "file.txt").write_text("hi")
+        subprocess.run(["git", "-C", str(tmp), "add", "."],
+                       check=True, env=env)
+        subprocess.run(["git", "-C", str(tmp), "commit", "-q", "-m", "init"],
+                       check=True, env=env)
+
+    def test_current_branch_returns_main_after_init(self) -> None:
+        import tempfile
+        from update_skill import git_current_branch
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_p = Path(tmp)
+            self._init_repo(tmp_p)
+            self.assertEqual(git_current_branch(tmp_p), "main")
+
+    def test_current_branch_returns_none_on_detached_head(self) -> None:
+        import tempfile
+        import subprocess
+        from update_skill import git_current_branch
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_p = Path(tmp)
+            self._init_repo(tmp_p)
+            # Detach by checking out the commit SHA directly.
+            sha = subprocess.run(
+                ["git", "-C", str(tmp_p), "rev-parse", "HEAD"],
+                capture_output=True, text=True, check=True,
+            ).stdout.strip()
+            subprocess.run(
+                ["git", "-C", str(tmp_p), "checkout", "-q", sha],
+                check=True,
+                env={**os.environ, "GIT_AUTHOR_NAME": "T", "GIT_AUTHOR_EMAIL": "t@t"},
+            )
+            self.assertIsNone(git_current_branch(tmp_p))
+
+    def test_current_branch_returns_feature_when_on_feature(self) -> None:
+        import tempfile
+        import subprocess
+        from update_skill import git_current_branch
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_p = Path(tmp)
+            self._init_repo(tmp_p)
+            subprocess.run(
+                ["git", "-C", str(tmp_p), "checkout", "-q", "-b", "feature/x"],
+                check=True,
+            )
+            self.assertEqual(git_current_branch(tmp_p), "feature/x")
 
 
 if __name__ == "__main__":

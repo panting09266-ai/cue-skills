@@ -77,6 +77,31 @@ _COOLDOWN_SECONDS = 24 * 3600  # 24h between silent checks
 _VERSION_RE = re.compile(r"(?m)^\s*version\s*:\s*[\"']?([^\s\"']+)[\"']?\s*$")
 
 
+def _semver_tuple(v: str) -> tuple | None:
+    """Parse `X.Y.Z` into a tuple for comparison. None on parse failure."""
+    try:
+        return tuple(int(p) for p in v.split("."))
+    except (ValueError, AttributeError):
+        return None
+
+
+def is_local_behind(local_v: str | None, remote_v: str | None) -> bool:
+    """True iff local version is STRICTLY OLDER than remote (semver tuple).
+
+    Returns False on: same version, missing versions, parse-failure, or
+    local ahead of remote (developer with unmerged work — don't nudge them
+    to 'upgrade' to an older release).
+    """
+    if not local_v or not remote_v or local_v == remote_v:
+        return False
+    lt, rt = _semver_tuple(local_v), _semver_tuple(remote_v)
+    if lt is None or rt is None:
+        # Non-semver versions (e.g. git tags / weird strings) — be
+        # conservative: nudge if they differ, since we can't compare.
+        return local_v != remote_v
+    return lt < rt
+
+
 def parse_version_from_md(md: str) -> str | None:
     """Extract `metadata.version` from a SKILL.md's YAML frontmatter.
 
@@ -185,6 +210,22 @@ def git_local_status(repo_root: Path) -> str:
     return _git(["status", "--porcelain"], repo_root).stdout.strip()
 
 
+def git_current_branch(repo_root: Path) -> str | None:
+    """Return the currently-checked-out branch name, or None if detached HEAD.
+
+    Used to refuse `+upgrade` unless the user is on the target branch — pulling
+    `origin/main` into a feature branch would either silently no-op (when
+    feature branch already contains main) or fail ff-only on diverged history.
+    Either way the user mental model "+upgrade installs the latest from
+    GitHub" doesn't match reality, so we refuse with a clear message.
+    """
+    res = _git(["symbolic-ref", "--short", "HEAD"], repo_root)
+    if res.returncode != 0:
+        return None  # detached HEAD
+    name = res.stdout.strip()
+    return name or None
+
+
 def git_fetch(repo_root: Path, branch: str = _DEFAULT_BRANCH) -> tuple[bool, str]:
     """Run `git fetch origin <branch>`. Return (ok, stderr-on-failure)."""
     res = _git(["fetch", "origin", branch], repo_root)
@@ -223,8 +264,9 @@ def _resolve_skill_dir(skill: str) -> Path:
 
 def _print_session_cache_note() -> None:
     print(
-        "\n⚠️ 已 load 的 SKILL.md 是 session 缓存,文件更新后必须**重启 agent / 重 load "
-        "SKILL.md** 才会生效。"
+        "\nℹ️ 已 load 的 SKILL.md 可能是 session 缓存——多数 agent(Claude Code / "
+        "Codex CLI / Gemini CLI 等)需要**重启 agent 或重 load SKILL.md** 才会读到新版;"
+        "少数 agent 支持文件变更自动 reload。不确定就重启一下最稳妥。"
     )
 
 
@@ -286,7 +328,7 @@ def silent_check_for_update(
     data[skill] = now
     _save_cooldown(data, cooldown_path)
 
-    if local_v and local_v != remote_v:
+    if is_local_behind(local_v, remote_v):
         sys.stderr.write(
             f"ℹ️  cue-skills/{skill} 有新版可用: {local_v} → {remote_v}。"
             f"运行 +upgrade 升级。\n"
@@ -355,6 +397,26 @@ def run_upgrade(
     # 3a. git mode — fetch + log + pull (with local-modification guard)
     if mode == "git":
         assert repo_root is not None
+
+        # Refuse if user is on a non-target branch or detached HEAD. Pulling
+        # origin/main into a feature branch either silently no-ops (feature
+        # already contains main) or fails ff-only on diverged history; either
+        # way the user mental model "+upgrade fetches the latest" breaks.
+        current = git_current_branch(repo_root)
+        if current is None:
+            sys.stderr.write(
+                f"[+upgrade] HEAD 处于 detached 状态(无 branch)。+upgrade 需要在 "
+                f"`{branch}` 分支上跑。请先 `git checkout {branch}` 再重试。\n"
+            )
+            return 1
+        if current != branch:
+            sys.stderr.write(
+                f"[+upgrade] 当前在分支 `{current}`,但 +upgrade 只升级 `{branch}`。"
+                f"请先 `git checkout {branch}` 再重试(或在 feature 分支上手动 "
+                f"`git rebase {branch}`/`git merge {branch}`,看你的工作流)。\n"
+            )
+            return 1
+
         print(f"\n[+upgrade] git fetch origin {branch} …")
         ok, err = git_fetch(repo_root, branch)
         if not ok:
@@ -425,20 +487,21 @@ def run_upgrade(
     else:
         print(f"           有新版可用: {local_v} → {remote_v}。手动更新方式:")
     print(
+        "\n⚠️  以下命令会**覆盖** {skill_dir} 下的任何本地手工改动。先 diff/备份,"
+        "再执行覆盖那一步。Cue 不会替你保留 ad-hoc edits。".format(skill_dir=skill_dir)
+    )
+    print(
         f"""
-  # 方式 A — 重新 clone 整个 repo 并覆盖
+  # 方式 A — 重新 clone 整个 repo,先 diff 备份再覆盖
   git clone --depth=1 {_GITHUB_REPO_URL}.git /tmp/cue-skills
-  # 备份你本地 skill 的任何手工改动:
   diff -ru {skill_dir} /tmp/cue-skills/{skill}/ > /tmp/{skill}.local-diff || true
-  # 覆盖:
-  cp -rf /tmp/cue-skills/{skill}/* {skill_dir}/
+  # ⬇️ 这一步覆盖(可改成 `cp -R -i` 加交互确认,或先看上面 diff):
+  cp -R /tmp/cue-skills/{skill}/* {skill_dir}/
 
-  # 方式 B — 下载最新 SKILL.md 单文件
+  # 方式 B — 下载最新 SKILL.md 单文件(只更新单个文件,不动 scripts/)
   curl -L {_RAW_SKILL_URL.format(branch=branch, skill=skill)} -o {skill_md}
-  # 其它 scripts/* 类同
 """
     )
-    print("⚠️  覆盖前务必 diff/备份本地改动;Cue 不会替你保留 ad-hoc edits。")
     _print_session_cache_note()
     return 1  # not actually updated; user must act
 

@@ -3,7 +3,7 @@ name: cue-buddy
 description: "Use when the user wants to author / validate / debug / pin-as-frequent a Cue 搭子(buddy) research template (corporate-credit pre-diligence, public-record compliance snapshot, earnings review, gov-procurement lead scan, private-fund DD, etc.) via natural conversation. Triggers: 创建搭子 / 做一个 X 搭子 / 调试模板 / 测试我的搭子 / 提交模板 / 设为常用 / 钉到工作台首页 / design a buddy for X / mark template as frequent. Cubemanus public-data tool surface only — refuse for private-data scenarios (real AML / medical diagnosis / internal accounting)."
 license: MIT
 metadata:
-  version: "0.1.0"
+  version: "0.2.0"
   requires:
     bins: ["python3"]
     envOptional: ["CUE_API_KEY", "CUE_API_BASE"]
@@ -129,6 +129,9 @@ export CUE_API_KEY=sk...
 "自动优化 tpl_xxx" / "根据问题改一下" / "tune this" / "调优"      → +tune
 "设为常用 tpl_xxx" / "钉到首页" / "mark frequent" / "pin to home"  → +frequent
 "取消常用 tpl_xxx" / "从首页摘掉" / "unpin" / "unfrequent"         → +unfrequent
+
+"升级 skill" / "更新 cue-skills" / "更新 cue-buddy" / "check for skill updates" / "拉一下最新版" → +upgrade
+(注意:"改 tpl_xxx" / "更新模板 X" 等带 template_id 的语义走 `+update <id>`,**不是** `+upgrade`)
 ──────────────────────────────────────────────────────────────────────────
 ```
 
