@@ -20,6 +20,7 @@ CI 友好 (stdlib only),不需要 cubemanus repo / uvicorn / fastapi。
 
 from __future__ import annotations
 
+import atexit
 import contextlib
 import json
 import os
@@ -69,6 +70,7 @@ def mock_server(handler_fn):
         yield f"http://127.0.0.1:{port}/api"
     finally:
         srv.shutdown()
+        srv.server_close()  # close the listening socket (silences ResourceWarning)
 
 
 # Canned capabilities payload (shape mirrors cubemanus
@@ -222,6 +224,16 @@ def _start_mock_server() -> tuple[str, ThreadingHTTPServer]:
 _BASE, _SRV = _start_mock_server()
 os.environ["CUE_API_BASE"] = _BASE
 os.environ["CUE_API_KEY"] = "sk-mock-contract-test"
+
+
+def _stop_module_mock_server() -> None:
+    """Cleanly shut down the module-level mock so the listening socket
+    doesn't leak — otherwise `-W error::ResourceWarning` would fail."""
+    _SRV.shutdown()
+    _SRV.server_close()
+
+
+atexit.register(_stop_module_mock_server)
 
 from cue_api import CueAPIError, capabilities  # noqa: E402
 
