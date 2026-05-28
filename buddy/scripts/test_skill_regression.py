@@ -620,6 +620,152 @@ class Case13_R10ReportTimeRuntimeCheck(unittest.TestCase):
         self.assertTrue(result.ok, "must pass when template requires no time field")
 
 
+class Case14_UpgradeSkillHelpers(unittest.TestCase):
+    """+upgrade verb helpers (update_skill.py): pure-function unit tests.
+
+    Network and git/subprocess paths are excluded — those are exercised
+    end-to-end at agent time, not in stdlib regression. We test the
+    pieces that matter: frontmatter parsing, install-mode detection,
+    skill-arg resolution, cooldown gating, and silent-check orchestration
+    with an injected fetch_fn (no network)."""
+
+    def test_parse_version_from_md_extracts_quoted_version(self) -> None:
+        from update_skill import parse_version_from_md
+        md = '---\nname: x\nmetadata:\n  version: "0.3.1"\n---\n# body\n'
+        self.assertEqual(parse_version_from_md(md), "0.3.1")
+
+    def test_parse_version_from_md_extracts_unquoted_version(self) -> None:
+        from update_skill import parse_version_from_md
+        md = "---\nname: x\nmetadata:\n  version: 1.2.3\n---\n"
+        self.assertEqual(parse_version_from_md(md), "1.2.3")
+
+    def test_parse_version_from_md_missing_returns_none(self) -> None:
+        from update_skill import parse_version_from_md
+        md = "---\nname: x\n---\n# body\n"
+        self.assertIsNone(parse_version_from_md(md))
+
+    def test_parse_version_from_md_no_frontmatter_returns_none(self) -> None:
+        from update_skill import parse_version_from_md
+        self.assertIsNone(parse_version_from_md("# just a body\nfoo\n"))
+
+    def test_detect_install_mode_git_when_dotgit_in_ancestor(self) -> None:
+        import tempfile
+        from update_skill import detect_install_mode
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_p = Path(tmp)
+            (tmp_p / ".git").mkdir()
+            skill_dir = tmp_p / "buddy"
+            skill_dir.mkdir()
+            mode, root = detect_install_mode(skill_dir)
+            self.assertEqual(mode, "git")
+            self.assertEqual(root, tmp_p)
+
+    def test_detect_install_mode_copy_when_no_dotgit(self) -> None:
+        import tempfile
+        from update_skill import detect_install_mode
+        with tempfile.TemporaryDirectory() as tmp:
+            skill_dir = Path(tmp) / "buddy"
+            skill_dir.mkdir()
+            mode, root = detect_install_mode(skill_dir)
+            self.assertEqual(mode, "copy")
+            self.assertIsNone(root)
+
+    def test_resolve_skill_dir_rejects_unknown(self) -> None:
+        from update_skill import _resolve_skill_dir
+        with self.assertRaises(ValueError):
+            _resolve_skill_dir("bogus-skill")
+
+    def test_resolve_skill_dir_accepts_known(self) -> None:
+        from update_skill import _resolve_skill_dir
+        # Should not raise for both known skills.
+        for s in ("buddy", "cue-research"):
+            d = _resolve_skill_dir(s)
+            self.assertTrue(d.name == s)
+
+    def test_cooldown_expired_when_no_record(self) -> None:
+        import tempfile
+        from update_skill import _cooldown_expired
+        with tempfile.TemporaryDirectory() as tmp:
+            p = Path(tmp) / "cooldown.json"
+            self.assertTrue(_cooldown_expired("buddy", now=1000.0,
+                                              cooldown_s=86400, path=p))
+
+    def test_cooldown_not_expired_when_recent(self) -> None:
+        import json as _json
+        import tempfile
+        from update_skill import _cooldown_expired
+        with tempfile.TemporaryDirectory() as tmp:
+            p = Path(tmp) / "cooldown.json"
+            p.write_text(_json.dumps({"buddy": 1000.0}))
+            # 1 hour later, 24h cooldown → still cooling down.
+            self.assertFalse(_cooldown_expired("buddy", now=1000.0 + 3600,
+                                                cooldown_s=86400, path=p))
+
+    def test_cooldown_expired_when_old(self) -> None:
+        import json as _json
+        import tempfile
+        from update_skill import _cooldown_expired
+        with tempfile.TemporaryDirectory() as tmp:
+            p = Path(tmp) / "cooldown.json"
+            p.write_text(_json.dumps({"buddy": 1000.0}))
+            # 25h later → expired.
+            self.assertTrue(_cooldown_expired("buddy", now=1000.0 + 25 * 3600,
+                                               cooldown_s=86400, path=p))
+
+    def test_silent_check_skips_when_cooldown_fresh(self) -> None:
+        """Cooldown gate short-circuits before any network attempt."""
+        import json as _json
+        import tempfile
+        from update_skill import silent_check_for_update
+        with tempfile.TemporaryDirectory() as tmp:
+            p = Path(tmp) / "cooldown.json"
+            p.write_text(_json.dumps({"buddy": 1000.0}))
+            calls = []
+            def boom_fetch(skill):
+                calls.append(skill)
+                return "9.9.9"
+            rc = silent_check_for_update(
+                skill="buddy", now=1000.0 + 60,
+                cooldown_path=p, fetch_fn=boom_fetch,
+            )
+            self.assertEqual(rc, 0)
+            self.assertEqual(calls, [], "fetch_fn must NOT be called when cooldown is fresh")
+
+    def test_silent_check_writes_cooldown_after_successful_fetch(self) -> None:
+        """After a successful version fetch the cooldown timestamp persists."""
+        import json as _json
+        import tempfile
+        from update_skill import silent_check_for_update
+        with tempfile.TemporaryDirectory() as tmp:
+            p = Path(tmp) / "cooldown.json"
+            # Inject a fetch that returns the same version as local — so no
+            # nudge, but the timestamp should still get written.
+            local_md = (Path(__file__).resolve().parents[1] / "SKILL.md")
+            from update_skill import parse_version_from_md
+            local_v = parse_version_from_md(local_md.read_text(encoding="utf-8"))
+            rc = silent_check_for_update(
+                skill="buddy", now=2000.0,
+                cooldown_path=p, fetch_fn=lambda s: local_v,
+            )
+            self.assertEqual(rc, 0)
+            data = _json.loads(p.read_text())
+            self.assertEqual(data.get("buddy"), 2000.0)
+
+    def test_silent_check_does_not_write_cooldown_on_network_failure(self) -> None:
+        """If fetch returns None (network down), cooldown stays untouched so
+        the next session retries instead of going silent for 24h."""
+        import tempfile
+        from update_skill import silent_check_for_update
+        with tempfile.TemporaryDirectory() as tmp:
+            p = Path(tmp) / "cooldown.json"
+            rc = silent_check_for_update(
+                skill="buddy", now=3000.0,
+                cooldown_path=p, fetch_fn=lambda s: None,
+            )
+            self.assertEqual(rc, 0)
+            self.assertFalse(p.exists(), "cooldown file must not be written on net failure")
+
+
 if __name__ == "__main__":
     # Unbuffered + verbose for skill author workflow.
     unittest.main(verbosity=2)
