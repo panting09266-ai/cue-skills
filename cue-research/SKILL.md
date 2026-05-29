@@ -22,6 +22,8 @@ Cue 工具面仅含**公开数据源**(工商/司法/监管/财报/资金流/招
 
 ## 准备
 
+**依赖**:本 skill 没有自带运行时脚本,所有原语从 sibling `../cue-buddy/scripts` 导入(见下文"导入约定")。因此 **`cue-buddy` 必须与本 skill 同级目录并装**(例如都在 `~/.claude/skills/` 下)——只装 cue-research 会在 import 时失败。
+
 跟 cue-buddy 共用一套 API key 配置(`CUE_API_KEY` env 或 `~/.cue/config.json`)。详见 [`../cue-buddy/SKILL.md`](../cue-buddy/SKILL.md) 的"准备"段。
 
 ## 调用约定(verbs)

@@ -27,9 +27,9 @@ Cue surface 扩展会陆续在这里加新 skill。
 
 ## 如何使用 skill
 
-每个 skill 文件夹是 self-contained:入口 `SKILL.md` + 支持的 `references/` + 必要时附 `scripts/`。
+`cue-buddy` 是 self-contained:入口 `SKILL.md` + 支持的 `references/` + stdlib-only `scripts/`。`cue-research` **自己没有运行时脚本**——复用 cue-buddy 的(`cue_api` / `sse_report`),因此必须与 `cue-buddy` **同级目录并装**。
 
-**Claude Code**:把 skill 文件夹 copy 到 `~/.claude/skills/`,或用 `/use-skill <path>` 引用。具体安装看 skill 自己的 README。
+**Claude Code**:把 skill 文件夹 copy 到 `~/.claude/skills/`,或用 `/use-skill <path>` 引用。具体安装看 skill 自己的 README。**装 `cue-research` 时,把 `cue-buddy` 装在它旁边**(同一父目录),共享脚本才能被找到。
 
 **其他 agent**:把 `<skill>/SKILL.md` 当 system instruction load。skill 的脚本尽量 stdlib-only。
 
