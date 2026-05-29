@@ -217,12 +217,18 @@ def normalize_report_format(rf: str) -> str:
         rf,
     )
 
-    # Sequential renumber pass
+    # Sequential renumber pass — skip sub-sections (`## 1.1 子节`) so they
+    # stay untouched; validator's _REPORT_SECTION_HEADING_RE uses the same
+    # `(?!\d)` negative lookahead to reject decimal sub-numbering at `##`
+    # level. (codex review 2026-05-29 nit)
     lines = rf.split("\n")
     counter = [0]
+    _SUB = re.compile(r"^##\s+\d+[.、]\d")
 
     def _renumber(ln: str) -> str:
-        m = re.match(r"^##\s+(?:\d+[.、]\s*)?(.+?)\s*$", ln)
+        if _SUB.match(ln):
+            return ln
+        m = re.match(r"^##\s+(?:\d+[.、](?!\d)\s*)?(.+?)\s*$", ln)
         if not m:
             return ln
         counter[0] += 1
