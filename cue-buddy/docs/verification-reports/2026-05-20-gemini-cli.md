@@ -69,3 +69,41 @@ Source trace lives under `~/.gemini/tmp/<project>/chats/` (Gemini CLI's local ch
 - Commits: `720bf68` (diagnose + replay fallback), `ad7bcb6` (replay CLI + broader except)
 - Skill regression tests covering this case: `cue-buddy/scripts/test_skill_regression.py:Case10_TestTemplateDiagnosis` (4 unittest)
 - Skill mock-server contract: `cue-buddy/scripts/test_cue_api_client_contract.py` (10 unittest)
+
+---
+
+## v0.2.0 status update (2026-05-29)
+
+> The run documented above was on **cue-buddy v0.1.0**. That header is left
+> unchanged for historical accuracy — it records the version actually
+> exercised on Gemini CLI on 2026-05-20. This section tracks where
+> verification stands at the current **v0.2.0** manifest.
+
+**What changed v0.1.0 → v0.2.0** (version bumped in commit `e472874`):
+
+- `+publish` / `+unpublish` → **`+frequent` / `+unfrequent`** rename (the verb-naming note at the top of this report). API endpoint + payload unchanged.
+- New **`+upgrade`** verb + session-start `--silent-check` (24h-cooldown GitHub-raw version compare; never prompts/auto-pulls).
+- New sibling skill **`cue-research`** (use buddies / free-form deep research): Stage 2 single-stage full-list semantic picking, weak-match nudge, `/api/rewrite` free-form path.
+- Quality rules codified for `title` and `goal` (R2 value-first card copy).
+- Onboarding first-screen redesign + numbered `1/2/3` selection prompts.
+- `tune_template` robustness: LLM-output parsing + format normalization + sub-section-safe renumber.
+- Publishing-standards pass (2026-05-29): directory rename `buddy/` → **`cue-buddy/`** (matches `name:`), version reconcile across READMEs, trigger-focused description trims, and a declared cue-research → cue-buddy install dependency.
+
+**v0.2.0 verification level** (what has actually been run):
+
+| Layer | Status |
+|---|---|
+| Local stdlib regression — cue-buddy | ✅ 50/50 |
+| Local stdlib regression — cue-research | ✅ 15/15 |
+| `cue_api` mock-server contract | ✅ 14/14 |
+| CI matrix (cue-buddy + cue-research × Python 3.12 / 3.13) | ✅ green (PRs #15, #16) |
+| Adversarial codex review of the publishing-standards changeset | ✅ 4 PASS + 1 declined nit |
+| **Live cross-agent run at v0.2.0 (driving the production API)** | ✅ **verified on Hermes, OpenClaw, Kimi** (real task run, live API) — among other agents |
+
+**v0.2.0 live cross-agent verification:** beyond the local + CI coverage above,
+v0.2.0 has been exercised with **real tasks against the production Cue API** on
+**Hermes, OpenClaw, and Kimi** (among others). This closes the gap that the
+v0.1.0 Gemini run alone left open: the new v0.2.0 surfaces — `+upgrade` and the
+`cue-research` flow — now have live cross-agent coverage, not just local suites
++ CI. (The 2026-05-20 Gemini run above remains the detailed write-up because a
+real bug surfaced there; these v0.2.0 runs are recorded here at summary level.)

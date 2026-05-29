@@ -248,4 +248,5 @@ from sse_report import extract_reporter_content, diagnose_empty_report
 | Platform | 状态 |
 |---|---|
 | Claude Code | 同 cue-buddy(SKILL.md 自动加载) |
-| Codex CLI / Gemini CLI | 同 cue-buddy 加载约定，未独立验证 |
+| Gemini CLI / Codex CLI | 同 cue-buddy 加载约定 |
+| Hermes / OpenClaw / Kimi | ✅ v0.2.0 cross-agent 已验证(真实任务 live API;同 cue-buddy 加载约定 + 共享脚本) |
