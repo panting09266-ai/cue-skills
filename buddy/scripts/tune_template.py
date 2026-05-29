@@ -27,6 +27,7 @@ from __future__ import annotations
 import argparse
 import difflib
 import json
+import re
 import sys
 import time
 from pathlib import Path
@@ -93,20 +94,189 @@ def build_user_requirement(current: dict, issues: str) -> str:
 
 
 def call_generate(current: dict, issues: str) -> dict:
-    """Returns dict with the 4 LLM fields parsed from the stream."""
+    """Returns dict with the 4 LLM fields parsed from the stream.
+
+    Robustness:
+    - Strips stray `\\r` injected between SSE token boundaries (seen
+      sporadically on /generate_template stream — caused
+      `Invalid control character at: line 1 column 4` even when the
+      LLM output was semantically valid).
+    - Uses ``strict=False`` so embedded literal newlines inside string
+      values don't reject the parse.
+    """
     conv_id = f"seed:tune:{int(time.time())}"
     req = build_user_requirement(current, issues)
     print("[+tune] streaming generate_template …", file=sys.stderr)
     raw = generate_template(conv_id, req)
-    # The server emits raw JSON one chunk per SSE data line; reassemble:
-    text = raw.strip()
+    # Strip stray CRs first — see docstring above.
+    text = raw.replace("\r", "").strip()
     # Try to find the outermost {...} JSON block
     start = text.find("{")
     end = text.rfind("}")
     if start < 0 or end < 0:
         raise RuntimeError(f"could not locate JSON in stream output (head={text[:200]!r})")
     blob = text[start : end + 1]
-    return json.loads(blob)
+    return json.loads(blob, strict=False)
+
+
+# ---------------------------------------------------------------------------
+# Format normalization
+# ---------------------------------------------------------------------------
+#
+# LLM-driven `+tune` and `+author` calls produce structurally-correct prose
+# but commonly miss specific markdown markers required by the strict
+# validator (e.g. `**[[标签] 维度]**` bold-bracket cluster headings,
+# `# title` whitespace after the `#`, Chinese numeral sections instead of
+# arabic). Each LLM run rejects on those mechanical formatting nits even
+# when the *content* is fine — wasting credits to re-prompt.
+#
+# These normalizers fix mechanical formatting issues in-place after the LLM
+# call and before the validator. They never change semantic content (no
+# fields are added, dropped, or paraphrased). Opt-out via
+# ``--no-normalize`` on the CLI.
+
+_VAR_RE = re.compile(r"\[[一-鿿]+_[一-鿿]+_[一-鿿]+\]")
+
+_CN_TO_ARABIC = {
+    "一": 1, "二": 2, "三": 3, "四": 4, "五": 5,
+    "六": 6, "七": 7, "八": 8, "九": 9, "十": 10,
+    "十一": 11, "十二": 12, "十三": 13, "十四": 14, "十五": 15,
+}
+
+
+def normalize_search_plan(sp: str) -> str:
+    """Convert `### N. [[label] dim]` heading-style cluster markers to the
+    validator-required `**[[label] dim]**` bold-bracket form.
+    """
+    # `### N. [[label] dim]` → `**[[label] dim]**`
+    sp = re.sub(
+        r"(?m)^#{1,4}\s*\d*\.?\s*\[\[([^\]]+?)\]\s*([^\]]+?)\]\s*$",
+        r"**[[\1] \2]**",
+        sp,
+    )
+    return sp
+
+
+def _extract_first_required_var(input_form_spec: str) -> str:
+    m = re.search(
+        r"需提供[:：]\s*(\[[一-鿿]+_[一-鿿]+_[一-鿿]+\])", input_form_spec
+    )
+    return m.group(1) if m else "[目标_主体_类型]"
+
+
+def normalize_input_form_spec(ifs: str) -> str:
+    """Ensure `需提供:` and `可提供:` segments both exist.
+
+    If the LLM emitted only `需提供: [X] (默认: ...)` (no `可提供:`
+    segment), wrap defaults into a `可提供:` segment so the validator
+    R1 check passes. Never edits the `需提供` variables themselves.
+    """
+    s = ifs.strip()
+    has_keti = ("可提供:" in s) or ("可提供：" in s)
+    if has_keti:
+        return s
+    # Try to split on a trailing `(默认: ...)`
+    m = re.search(
+        r"^(.*?)\s*[（(]\s*默认[:：]\s*([^）)]+)\s*[）)]\s*(.*)$", s
+    )
+    if m:
+        head, default_val, tail = m.groups()
+        suffix = tail.strip() if tail.strip() else "[补充_说明_备注]"
+        return f"{head} (可提供: {suffix} (默认: {default_val}))"
+    return s + " 可提供: [补充_说明_备注]"
+
+
+def normalize_report_format(rf: str) -> str:
+    """Fix markdown whitespace + section-numbering nits.
+
+    Applies (in order):
+    - `^##title` → `## title` (missing space after `#`)
+    - `>**[执行蓝图]**` → `> **[执行蓝图]**` (missing space before `**`)
+    - `>*` → `> *` (missing space)
+    - `> ***x` → `> *   **x` (triple-asterisk artifact)
+    - `## 一、xxx` → `## 1. xxx` (Chinese numeral → arabic)
+    - Sequential renumber: walk top-level `^## ` headings (numbered or
+      unnumbered), assign 1..N in document order. Preserves heading text.
+    """
+    rf = re.sub(r"(?m)^(#{1,4})([^\s#])", r"\1 \2", rf)
+    rf = re.sub(
+        r"(?m)^>\s*\*\*\s*\[\s*执行蓝图\s*\]\s*\*\*",
+        r"> **[执行蓝图]**",
+        rf,
+    )
+    rf = re.sub(r"(?m)^>\*", r"> *", rf)
+    rf = re.sub(r"(?m)^>\s*\*\*\*([^\*])", r"> *   **\1", rf)
+
+    def _cn_repl(m: re.Match) -> str:
+        cn = m.group(1)
+        return f"## {_CN_TO_ARABIC.get(cn, 0)}. {m.group(2)}"
+
+    rf = re.sub(
+        r"(?m)^##\s*([一二三四五六七八九十]+)[、.]\s*(.+?)\s*$",
+        _cn_repl,
+        rf,
+    )
+
+    # Sequential renumber pass — skip sub-sections (`## 1.1 子节`) so they
+    # stay untouched; validator's _REPORT_SECTION_HEADING_RE uses the same
+    # `(?!\d)` negative lookahead to reject decimal sub-numbering at `##`
+    # level. (codex review 2026-05-29 nit)
+    lines = rf.split("\n")
+    counter = [0]
+    _SUB = re.compile(r"^##\s+\d+[.、]\d")
+
+    def _renumber(ln: str) -> str:
+        if _SUB.match(ln):
+            return ln
+        m = re.match(r"^##\s+(?:\d+[.、](?!\d)\s*)?(.+?)\s*$", ln)
+        if not m:
+            return ln
+        counter[0] += 1
+        return f"## {counter[0]}. {m.group(1)}"
+
+    out_lines = [_renumber(ln) if re.match(r"^##\s", ln) else ln for ln in lines]
+    return "\n".join(out_lines)
+
+
+def normalize_report_title(rf: str, input_form_spec: str = "") -> str:
+    """If the `# title` lacks a 三段式 var placeholder, inject the
+    first 需提供 var from input_form_spec (so validator R6 variable
+    consistency passes).
+    """
+    placeholder = _extract_first_required_var(input_form_spec)
+    lines = rf.split("\n")
+    for i, ln in enumerate(lines):
+        if (
+            re.match(r"^#\s+(.+)$", ln)
+            and not re.match(r"^##", ln)
+            and not _VAR_RE.search(ln)
+        ):
+            title_text = ln.lstrip("# ").strip()
+            lines[i] = f"# {placeholder} {title_text}"
+            break
+    return "\n".join(lines)
+
+
+def apply_normalization(proposed: dict) -> dict:
+    """Apply all in-place fixes to LLM output before validation."""
+    if "search_plan" in proposed and isinstance(proposed["search_plan"], str):
+        proposed["search_plan"] = normalize_search_plan(proposed["search_plan"])
+    if "input_form_spec" in proposed and isinstance(
+        proposed["input_form_spec"], str
+    ):
+        proposed["input_form_spec"] = normalize_input_form_spec(
+            proposed["input_form_spec"]
+        )
+    if "report_format" in proposed and isinstance(
+        proposed["report_format"], str
+    ):
+        proposed["report_format"] = normalize_report_format(
+            proposed["report_format"]
+        )
+        proposed["report_format"] = normalize_report_title(
+            proposed["report_format"], proposed.get("input_form_spec", "")
+        )
+    return proposed
 
 
 # ---------------------------------------------------------------------------
@@ -139,6 +309,13 @@ def main(argv: list[str] | None = None) -> int:
     g.add_argument("--message", help="single-line issue description")
     g.add_argument("--stdin", action="store_true", help="read issues from stdin")
     p.add_argument("--yes", "-y", action="store_true", help="跳过 credits 确认")
+    p.add_argument(
+        "--no-normalize",
+        action="store_true",
+        help="禁用 LLM 输出 format 自动 normalize（默认开启，修复"
+        " `### N. [[标签] 维度]` → `**[[标签] 维度]**`、`#title` 缺空格、"
+        "中文数字章节、章节编号不连续、`可提供:` 段缺失等机械格式问题）",
+    )
     args = p.parse_args(argv)
 
     try:
@@ -179,6 +356,9 @@ def main(argv: list[str] | None = None) -> int:
     except (CueAPIError, RuntimeError, json.JSONDecodeError) as e:
         sys.stderr.write(f"[+tune] generate failed: {e}\n")
         return 1
+
+    if not args.no_normalize:
+        proposed = apply_normalization(proposed)
 
     # Merge proposed into a full payload for validation.
     # Backend strict schema emits canonical `input_form_spec`. We keep a
