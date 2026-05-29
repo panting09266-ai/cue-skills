@@ -46,7 +46,7 @@ Agent: [reads SKILL.md → triggers +author flow]
 
 ## Status
 
-**v0.2.0** — cross-agent verified on Claude Code + Gemini CLI + Codex CLI **at v0.1.0** (see [`docs/verification-reports/2026-05-20-gemini-cli.md`](./docs/verification-reports/2026-05-20-gemini-cli.md); that run drove the `+test` long-stream replay-fallback hardening). The v0.2.0 deltas (`+upgrade`, the `cue-research` sibling) are covered by local suites + CI; a fresh live cross-agent run is still pending — see the report's **v0.2.0 status update** section. OpenClaw via manual SKILL.md loading (not independently verified).
+**v0.2.0** — cross-agent verified. The detailed write-up ([`docs/verification-reports/2026-05-20-gemini-cli.md`](./docs/verification-reports/2026-05-20-gemini-cli.md)) is the v0.1.0 Gemini CLI run that drove the `+test` long-stream replay-fallback hardening; Claude Code + Codex CLI were verified alongside it. **v0.2.0 itself has live cross-agent runs** (real tasks against the production API) on **Hermes, OpenClaw, and Kimi**, among others — see the report's **v0.2.0 status update** section.
 
 ## Who this is for
 

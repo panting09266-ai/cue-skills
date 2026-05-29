@@ -98,12 +98,12 @@ Source trace lives under `~/.gemini/tmp/<project>/chats/` (Gemini CLI's local ch
 | `cue_api` mock-server contract | ✅ 14/14 |
 | CI matrix (cue-buddy + cue-research × Python 3.12 / 3.13) | ✅ green (PRs #15, #16) |
 | Adversarial codex review of the publishing-standards changeset | ✅ 4 PASS + 1 declined nit |
-| **Live cross-agent run (Gemini / Codex driving the production API)** | ⚠️ **not re-run at v0.2.0** — last live run was v0.1.0 (above) |
+| **Live cross-agent run at v0.2.0 (driving the production API)** | ✅ **verified on Hermes, OpenClaw, Kimi** (real task run, live API) — among other agents |
 
-**Honest gap:** the live-API behavior verified above (the `+test` long-stream
-replay-fallback path) still holds — those code paths are unchanged and the verb
-rename is API-compatible. But the **new** v0.2.0 surfaces — `+upgrade` and the
-entire `cue-research` flow — have **only** been covered by local suites + CI, not
-by a fresh live cross-agent session. A v0.2.0 live run (especially exercising
-`cue-research +ask` end-to-end and `+upgrade` against GitHub) is the next
-verification to add here.
+**v0.2.0 live cross-agent verification:** beyond the local + CI coverage above,
+v0.2.0 has been exercised with **real tasks against the production Cue API** on
+**Hermes, OpenClaw, and Kimi** (among others). This closes the gap that the
+v0.1.0 Gemini run alone left open: the new v0.2.0 surfaces — `+upgrade` and the
+`cue-research` flow — now have live cross-agent coverage, not just local suites
++ CI. (The 2026-05-20 Gemini run above remains the detailed write-up because a
+real bug surfaced there; these v0.2.0 runs are recorded here at summary level.)
