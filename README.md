@@ -10,8 +10,8 @@ A **skill** is a portable instruction bundle that any AI agent ([Claude Code](ht
 
 | Skill | Purpose | Status |
 |---|---|---|
-| [`buddy/`](./buddy) — **cue-buddy** | Lets business experts author, validate, test, tune, and pin-as-frequent [Cue](https://cuecue.cn) "buddy" research templates via natural conversation. No Python / API knowledge needed; the agent talks to the Cue production API on the user's behalf. | v0.1.0 |
-| [`cue-research/`](./cue-research) — **cue-research** | Sibling to cue-buddy for *using* Cue from inside your AI agent: ask a question → skill matches ≤2 candidate buddies (or routes to free-form deep research via `/api/rewrite`) → you confirm credits → it runs → on satisfaction you can distill a free-form run into a saved buddy via cue-buddy. | v0.1.0 |
+| [`cue-buddy/`](./cue-buddy) — **cue-buddy** | Lets business experts author, validate, test, tune, and pin-as-frequent [Cue](https://cuecue.cn) "buddy" research templates via natural conversation. No Python / API knowledge needed; the agent talks to the Cue production API on the user's behalf. | v0.2.0 |
+| [`cue-research/`](./cue-research) — **cue-research** | Sibling to cue-buddy for *using* Cue from inside your AI agent: ask a question → skill matches ≤2 candidate buddies (or routes to free-form deep research via `/api/rewrite`) → you confirm credits → it runs → on satisfaction you can distill a free-form run into a saved buddy via cue-buddy. | v0.2.0 |
 
 More skills will be added here as Cue's surface grows.
 
@@ -23,7 +23,7 @@ A **"buddy" (搭子)** is a research playbook for a specific scenario — corpor
 
 > **Scope boundary**: Cue's tool surface covers public data sources only (equity disclosures / business registries / court records / regulatory filings / capital flows / etc.). Scenarios requiring private data (real AML on bank-internal transactions, medical diagnosis, internal accounting) are **not appropriate** as Cue buddies — the supervisor cannot route them and falls back to generic web search. `cue-buddy +author` flow calls `+capabilities` to cross-check each declared evidence source against the actual catalog before persisting a template.
 
-See [`buddy/README.md`](./buddy/README.md) for the full skill walkthrough.
+See [`cue-buddy/README.md`](./cue-buddy/README.md) for the full skill walkthrough.
 
 ## Using a skill
 

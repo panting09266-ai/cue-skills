@@ -19,7 +19,7 @@ This report sediments what surfaced during the real-world Gemini CLI run so futu
 
 | Verb | Outcome |
 |---|---|
-| Skill load (Gemini reads `buddy/SKILL.md` via repo URL) | ✓ skill registered, +author trigger phrases recognized |
+| Skill load (Gemini reads `cue-buddy/SKILL.md` via repo URL) | ✓ skill registered, +author trigger phrases recognized |
 | `+list` (list user's templates) | ✓ returned existing template inventory |
 | `+capabilities` | ✓ returned Cue researcher surface (~391 tools / ~56 categories / 10 presets, ETag-cached); user drilled into specific category for tool details |
 | `+test <template_id> <entity>` on subject 第四范式 (A-share AI listed company `688310.SH`) | ⚠️ stream hit long-running deep research (>5min), client SSE disconnected before reporter agent started; script reported `no reporter content captured — check workflow_id / template_id`, **misleading user into thinking the template was broken** |
@@ -67,5 +67,5 @@ Source trace lives under `~/.gemini/tmp/<project>/chats/` (Gemini CLI's local ch
 ## References
 
 - Commits: `720bf68` (diagnose + replay fallback), `ad7bcb6` (replay CLI + broader except)
-- Skill regression tests covering this case: `buddy/scripts/test_skill_regression.py:Case10_TestTemplateDiagnosis` (4 unittest)
-- Skill mock-server contract: `buddy/scripts/test_cue_api_client_contract.py` (10 unittest)
+- Skill regression tests covering this case: `cue-buddy/scripts/test_skill_regression.py:Case10_TestTemplateDiagnosis` (4 unittest)
+- Skill mock-server contract: `cue-buddy/scripts/test_cue_api_client_contract.py` (10 unittest)

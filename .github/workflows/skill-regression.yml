@@ -18,9 +18,9 @@ jobs:
     strategy:
       fail-fast: false  # 一个 skill 挂不挡其他 skill 的反馈
       matrix:
-        # 加新 skill: 在这里 append skill 文件夹名,sibling 到 buddy/
+        # 加新 skill: 在这里 append skill 文件夹名,sibling 到 cue-buddy/
         # 每个 skill 须有 scripts/test_skill_regression.py + SKILL.md frontmatter
-        skill: [buddy, cue-research]
+        skill: [cue-buddy, cue-research]
         # 跟 cubemanus backend pinned 3.12 一致,plus 一个 rolling latest
         python-version: ["3.12", "3.13"]
     steps:
@@ -58,26 +58,26 @@ jobs:
         run: python3 ${{ matrix.skill }}/scripts/test_skill_regression.py
 
       # ============================================================
-      # buddy-specific extras (cue-buddy template authoring skill)
+      # cue-buddy-specific extras (cue-buddy template authoring skill)
       # 加新 skill 时若有独有 contract/CLI smoke,再加一组 `if:` 块
       # ============================================================
 
-      - name: (buddy) cue_api client contract test (stdlib mock server)
-        if: matrix.skill == 'buddy'
+      - name: (cue-buddy) cue_api client contract test (stdlib mock server)
+        if: matrix.skill == 'cue-buddy'
         # codex r3: 把"capabilities 合约"放进 CI 而非只 local dev 可跑。
         # http.server + threading mock,不依赖 cubemanus/uvicorn/fastapi。
         # 验 client wire format:URL/Bearer/query 序列化/ETag 304/4xx 错误传播。
         run: python3 ${{ matrix.skill }}/scripts/test_cue_api_client_contract.py
 
-      - name: (buddy) CLI smoke — validate_template.py --help
-        if: matrix.skill == 'buddy'
+      - name: (cue-buddy) CLI smoke — validate_template.py --help
+        if: matrix.skill == 'cue-buddy'
         # codex r2: argparse --help 之前被当文件路径读 FileNotFoundError,现已修。
         run: |
           python3 ${{ matrix.skill }}/scripts/validate_template.py --help | grep -q "validate_template.py"
           python3 ${{ matrix.skill }}/scripts/validate_template.py >/dev/null
 
-      - name: (buddy) CLI smoke — cue_api.py capabilities subcommand
-        if: matrix.skill == 'buddy'
+      - name: (cue-buddy) CLI smoke — cue_api.py capabilities subcommand
+        if: matrix.skill == 'cue-buddy'
         # codex r3: doc 说有 +capabilities verb 但缺 CLI,现已加。
         # 无 API key 应 exit 2 + 'API key' 提示,而非 KeyError。
         run: |
@@ -89,8 +89,8 @@ jobs:
           test "$ec" -ne 0
           echo "$out" | grep -qi "API key"
 
-      - name: (buddy) CLI smoke — cue_api.py replay subcommand known
-        if: matrix.skill == 'buddy'
+      - name: (cue-buddy) CLI smoke — cue_api.py replay subcommand known
+        if: matrix.skill == 'cue-buddy'
         # codex r5: test_template.py fallback hint 写 'cue_api.py replay <conv_id>',
         # 之前 CLI 没此子命令报 unknown cmd。现已加 → 无 conv_id 应 print usage + exit 2。
         run: |
@@ -102,8 +102,8 @@ jobs:
           echo "$out" | grep -q "usage: cue_api.py replay"
           test "$ec" -eq 2
 
-      - name: (buddy) Validator self-check (regex 5-family coverage)
-        if: matrix.skill == 'buddy'
+      - name: (cue-buddy) Validator self-check (regex 5-family coverage)
+        if: matrix.skill == 'cue-buddy'
         # codex r3 r1 Block A: TOOL_NAME_LEAK_RE 应覆盖 get_*/list_*/find_*/
         # search_tool*/crawl_tool* 5 工具家族(过去 regex 漏后两类)。
         run: |

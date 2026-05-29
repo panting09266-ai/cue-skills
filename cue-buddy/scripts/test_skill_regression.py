@@ -655,7 +655,7 @@ class Case14_UpgradeSkillHelpers(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             tmp_p = Path(tmp)
             (tmp_p / ".git").mkdir()
-            skill_dir = tmp_p / "buddy"
+            skill_dir = tmp_p / "cue-buddy"
             skill_dir.mkdir()
             mode, root = detect_install_mode(skill_dir)
             self.assertEqual(mode, "git")
@@ -665,7 +665,7 @@ class Case14_UpgradeSkillHelpers(unittest.TestCase):
         import tempfile
         from update_skill import detect_install_mode
         with tempfile.TemporaryDirectory() as tmp:
-            skill_dir = Path(tmp) / "buddy"
+            skill_dir = Path(tmp) / "cue-buddy"
             skill_dir.mkdir()
             mode, root = detect_install_mode(skill_dir)
             self.assertEqual(mode, "copy")
@@ -679,7 +679,7 @@ class Case14_UpgradeSkillHelpers(unittest.TestCase):
     def test_resolve_skill_dir_accepts_known(self) -> None:
         from update_skill import _resolve_skill_dir
         # Should not raise for both known skills.
-        for s in ("buddy", "cue-research"):
+        for s in ("cue-buddy", "cue-research"):
             d = _resolve_skill_dir(s)
             self.assertTrue(d.name == s)
 
@@ -688,7 +688,7 @@ class Case14_UpgradeSkillHelpers(unittest.TestCase):
         from update_skill import _cooldown_expired
         with tempfile.TemporaryDirectory() as tmp:
             p = Path(tmp) / "cooldown.json"
-            self.assertTrue(_cooldown_expired("buddy", now=1000.0,
+            self.assertTrue(_cooldown_expired("cue-buddy", now=1000.0,
                                               cooldown_s=86400, path=p))
 
     def test_cooldown_not_expired_when_recent(self) -> None:
@@ -697,9 +697,9 @@ class Case14_UpgradeSkillHelpers(unittest.TestCase):
         from update_skill import _cooldown_expired
         with tempfile.TemporaryDirectory() as tmp:
             p = Path(tmp) / "cooldown.json"
-            p.write_text(_json.dumps({"buddy": 1000.0}))
+            p.write_text(_json.dumps({"cue-buddy": 1000.0}))
             # 1 hour later, 24h cooldown → still cooling down.
-            self.assertFalse(_cooldown_expired("buddy", now=1000.0 + 3600,
+            self.assertFalse(_cooldown_expired("cue-buddy", now=1000.0 + 3600,
                                                 cooldown_s=86400, path=p))
 
     def test_cooldown_expired_when_old(self) -> None:
@@ -708,9 +708,9 @@ class Case14_UpgradeSkillHelpers(unittest.TestCase):
         from update_skill import _cooldown_expired
         with tempfile.TemporaryDirectory() as tmp:
             p = Path(tmp) / "cooldown.json"
-            p.write_text(_json.dumps({"buddy": 1000.0}))
+            p.write_text(_json.dumps({"cue-buddy": 1000.0}))
             # 25h later → expired.
-            self.assertTrue(_cooldown_expired("buddy", now=1000.0 + 25 * 3600,
+            self.assertTrue(_cooldown_expired("cue-buddy", now=1000.0 + 25 * 3600,
                                                cooldown_s=86400, path=p))
 
     def test_silent_check_skips_when_cooldown_fresh(self) -> None:
@@ -720,13 +720,13 @@ class Case14_UpgradeSkillHelpers(unittest.TestCase):
         from update_skill import silent_check_for_update
         with tempfile.TemporaryDirectory() as tmp:
             p = Path(tmp) / "cooldown.json"
-            p.write_text(_json.dumps({"buddy": 1000.0}))
+            p.write_text(_json.dumps({"cue-buddy": 1000.0}))
             calls = []
             def boom_fetch(skill):
                 calls.append(skill)
                 return "9.9.9"
             rc = silent_check_for_update(
-                skill="buddy", now=1000.0 + 60,
+                skill="cue-buddy", now=1000.0 + 60,
                 cooldown_path=p, fetch_fn=boom_fetch,
             )
             self.assertEqual(rc, 0)
@@ -745,12 +745,12 @@ class Case14_UpgradeSkillHelpers(unittest.TestCase):
             from update_skill import parse_version_from_md
             local_v = parse_version_from_md(local_md.read_text(encoding="utf-8"))
             rc = silent_check_for_update(
-                skill="buddy", now=2000.0,
+                skill="cue-buddy", now=2000.0,
                 cooldown_path=p, fetch_fn=lambda s: local_v,
             )
             self.assertEqual(rc, 0)
             data = _json.loads(p.read_text())
-            self.assertEqual(data.get("buddy"), 2000.0)
+            self.assertEqual(data.get("cue-buddy"), 2000.0)
 
     def test_silent_check_does_not_write_cooldown_on_network_failure(self) -> None:
         """If fetch returns None (network down), cooldown stays untouched so
@@ -760,7 +760,7 @@ class Case14_UpgradeSkillHelpers(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             p = Path(tmp) / "cooldown.json"
             rc = silent_check_for_update(
-                skill="buddy", now=3000.0,
+                skill="cue-buddy", now=3000.0,
                 cooldown_path=p, fetch_fn=lambda s: None,
             )
             self.assertEqual(rc, 0)
