@@ -18,11 +18,11 @@ Stdlib only. Read-only checks except the final `git pull` (gated on user
 confirmation).
 
 Usage:
-  python3 buddy/scripts/update_skill.py [--skill buddy|cue-research]
-                                        [--yes] [--dry-run]
-                                        [--check-only] [--silent-check]
+  python3 cue-buddy/scripts/update_skill.py [--skill cue-buddy|cue-research]
+                                            [--yes] [--dry-run]
+                                            [--check-only] [--silent-check]
 
-  --skill         which skill (default: buddy)
+  --skill         which skill (default: cue-buddy)
   --yes / -y      skip confirmation prompt
   --dry-run       show diff but do not pull
   --check-only    compare versions only; no diff, no pull
@@ -55,7 +55,7 @@ from pathlib import Path
 
 _HERE = Path(__file__).resolve().parent
 _REPO_ROOT = _HERE.parent.parent
-_KNOWN_SKILLS = ("buddy", "cue-research")
+_KNOWN_SKILLS = ("cue-buddy", "cue-research")
 _DEFAULT_BRANCH = "main"
 _RAW_SKILL_URL = (
     "https://raw.githubusercontent.com/sensedeal/cue-skills/"
@@ -271,7 +271,7 @@ def _print_session_cache_note() -> None:
 
 
 def silent_check_for_update(
-    skill: str = "buddy",
+    skill: str = "cue-buddy",
     branch: str = _DEFAULT_BRANCH,
     cooldown_s: int = _COOLDOWN_SECONDS,
     cooldown_path: Path = _COOLDOWN_PATH,
@@ -337,7 +337,7 @@ def silent_check_for_update(
 
 
 def run_upgrade(
-    skill: str = "buddy",
+    skill: str = "cue-buddy",
     branch: str = _DEFAULT_BRANCH,
     yes: bool = False,
     dry_run: bool = False,
@@ -522,8 +522,8 @@ def _cli(argv: list[str] | None = None) -> int:
         epilog=__doc__.split("Usage:", 1)[-1] if __doc__ else "",
     )
     p.add_argument(
-        "--skill", default="buddy", choices=list(_KNOWN_SKILLS),
-        help="which skill to check (default: buddy)",
+        "--skill", default="cue-buddy", choices=list(_KNOWN_SKILLS),
+        help="which skill to check (default: cue-buddy)",
     )
     p.add_argument("--branch", default=_DEFAULT_BRANCH, help=argparse.SUPPRESS)
     p.add_argument("--yes", "-y", action="store_true",

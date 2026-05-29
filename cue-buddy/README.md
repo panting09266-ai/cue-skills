@@ -46,7 +46,7 @@ Agent: [reads SKILL.md → triggers +author flow]
 
 ## Status
 
-**v0.1.0** — verified on Claude Code + Gemini CLI + Codex CLI (see [`docs/verification-reports/2026-05-20-gemini-cli.md`](./docs/verification-reports/2026-05-20-gemini-cli.md) for the cross-agent run that drove the `+test` long-stream replay-fallback hardening); should work on OpenClaw via manual SKILL.md loading (not yet independently verified).
+**v0.2.0** — verified on Claude Code + Gemini CLI + Codex CLI (see [`docs/verification-reports/2026-05-20-gemini-cli.md`](./docs/verification-reports/2026-05-20-gemini-cli.md) for the cross-agent run that drove the `+test` long-stream replay-fallback hardening); should work on OpenClaw via manual SKILL.md loading (not yet independently verified).
 
 ## Who this is for
 
@@ -126,7 +126,7 @@ See [`references/materials-intake.md`](references/materials-intake.md) for the d
 ## Repo layout
 
 ```
-buddy/
+cue-buddy/
 ├── SKILL.md                   # Skill spec read by the calling agent
 ├── scripts/
 │   ├── cue_api.py             # Stdlib-only HTTP client (no deps)

@@ -10,8 +10,8 @@
 
 | Skill | 用途 | 状态 |
 |---|---|---|
-| [`buddy/`](./buddy) — **cue-buddy** | 让业务专家通过自然对话起草、校验、测试、调优、设为常用 [Cue](https://cuecue.cn) 搭子（buddy）调研模板。不需要 Python / 不需要懂 API；agent 替用户调 Cue 生产 API。 | v0.1.0 |
-| [`cue-research/`](./cue-research) — **cue-research** | cue-buddy 的兄弟 skill,负责在你自己的 AI agent 里**用** Cue：自然语言提问 → 匹配 ≤2 个候选搭子(或走 `/api/rewrite` 自由式深研) → 确认 credits → 跑 → 满意可一键沉淀为搭子(回流给 cue-buddy)。 | v0.1.0 |
+| [`cue-buddy/`](./cue-buddy) — **cue-buddy** | 让业务专家通过自然对话起草、校验、测试、调优、设为常用 [Cue](https://cuecue.cn) 搭子（buddy）调研模板。不需要 Python / 不需要懂 API；agent 替用户调 Cue 生产 API。 | v0.2.0 |
+| [`cue-research/`](./cue-research) — **cue-research** | cue-buddy 的兄弟 skill,负责在你自己的 AI agent 里**用** Cue：自然语言提问 → 匹配 ≤2 个候选搭子(或走 `/api/rewrite` 自由式深研) → 确认 credits → 跑 → 满意可一键沉淀为搭子(回流给 cue-buddy)。 | v0.2.0 |
 
 Cue surface 扩展会陆续在这里加新 skill。
 
@@ -21,7 +21,7 @@ Cue surface 扩展会陆续在这里加新 skill。
 
 **"搭子"** 是一份针对具体场景的调研 playbook——对公授信预尽调 / 主体合规风险公开快照 / 季度财报点评 / 私募尽调 等——定义一次,之后给个主体名就跑完。本仓库的 `cue-buddy` skill 就是让业务专家**用对话** author 这些 playbook 的工具。
 
-详细 walkthrough:[`buddy/README.zh-CN.md`](./buddy/README.zh-CN.md)。
+详细 walkthrough:[`cue-buddy/README.zh-CN.md`](./cue-buddy/README.zh-CN.md)。
 
 > **范围边界**:Cue 工具面仅覆盖**公开数据源**(上市公司披露 / 工商登记 / 司法公开 / 监管处罚 / 资金流向 等)。需要**私有数据**的场景(银行真正反洗钱 AML 需内部交易流水 / 医疗诊断 / 企业内账)**不适合做 Cue 搭子**——supervisor 路由不到匹配工具,只能 web_search 兜底。`cue-buddy +author` 在起草时会调 `+capabilities` 交叉验证每个 search_plan 维度,无 category 兜底时 warn 用户。
 

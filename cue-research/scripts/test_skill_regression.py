@@ -20,7 +20,7 @@ from pathlib import Path
 _HERE = Path(__file__).resolve().parent
 _SKILL_DIR = _HERE.parent
 _REPO_ROOT = _SKILL_DIR.parent
-_BUDDY_SCRIPTS = _REPO_ROOT / "buddy" / "scripts"
+_BUDDY_SCRIPTS = _REPO_ROOT / "cue-buddy" / "scripts"
 
 # This sys.path pattern is the one SKILL.md tells the agent/scripts to use.
 sys.path.insert(0, str(_BUDDY_SCRIPTS))
