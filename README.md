@@ -27,9 +27,9 @@ See [`cue-buddy/README.md`](./cue-buddy/README.md) for the full skill walkthroug
 
 ## Using a skill
 
-Each skill folder is self-contained: an entrypoint `SKILL.md`, supporting `references/`, and scripts where applicable.
+`cue-buddy` is self-contained: an entrypoint `SKILL.md`, supporting `references/`, and stdlib-only `scripts/`. `cue-research` ships **no runtime scripts of its own** — it reuses cue-buddy's (`cue_api` / `sse_report`), so it must be installed **alongside `cue-buddy` as a sibling folder**.
 
-**Claude Code**: copy the skill folder into `~/.claude/skills/` or reference it via `/use-skill <path>`. See per-skill README for exact installation.
+**Claude Code**: copy the skill folder into `~/.claude/skills/` or reference it via `/use-skill <path>`. See per-skill README for exact installation. **For `cue-research`, install `cue-buddy` next to it** (same parent dir) so its shared scripts resolve.
 
 **Other agents**: load `<skill>/SKILL.md` as a system instruction. The skill's scripts are stdlib-only Python where possible.
 
