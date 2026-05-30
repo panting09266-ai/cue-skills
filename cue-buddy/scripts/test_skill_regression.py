@@ -74,7 +74,7 @@ class Case2_LegacyTaskConfigsNormalizedToSchedules(unittest.TestCase):
                 {
                     "type": "weekly",
                     "time": "09:00",
-                    "date_param": "MON",
+                    "date_param": "1",
                     "dates": None,
                     "name": "weekly",
                 },
@@ -90,7 +90,7 @@ class Case2_LegacyTaskConfigsNormalizedToSchedules(unittest.TestCase):
         for s in out["schedules"]:
             self.assertEqual(set(s.keys()), {"type", "time", "date_param", "dates"})
         self.assertEqual(out["schedules"][0]["type"], "daily")
-        self.assertEqual(out["schedules"][1]["date_param"], "MON")
+        self.assertEqual(out["schedules"][1]["date_param"], "1")
 
     def test_schedules_present_wins_over_task_configs(self) -> None:
         """如果 caller 已传 schedules,不被 task_configs 覆盖。"""
@@ -101,7 +101,7 @@ class Case2_LegacyTaskConfigsNormalizedToSchedules(unittest.TestCase):
                 {"type": "daily", "time": "10:00", "date_param": None, "dates": None}
             ],
             "task_configs": [
-                {"type": "weekly", "time": "11:00", "date_param": "TUE", "dates": None}
+                {"type": "weekly", "time": "11:00", "date_param": "2", "dates": None}
             ],
         }
         out = _normalize_template_payload(payload)

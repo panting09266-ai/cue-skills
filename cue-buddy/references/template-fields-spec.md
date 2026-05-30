@@ -354,19 +354,24 @@
 
 ```python
 "schedules": [
-    {"type": "daily",  "time": "09:00", "date_param": None, "dates": None},
-    {"type": "weekly", "time": "09:00", "date_param": "MON", "dates": None},
+    {"type": "daily",   "time": "09:00", "date_param": None,         "dates": None},
+    {"type": "weekly",  "time": "09:00", "date_param": None,         "dates": ["1"]},        # 1=周一 … 7=周日
+    {"type": "monthly", "time": "09:00", "date_param": None,         "dates": ["1", "15"]},  # 每月 1 号、15 号
+    {"type": "once",    "time": "09:00", "date_param": "2026-12-31", "dates": None},
 ]
 ```
 
 字段:
 - `type`: `daily` / `weekly` / `monthly` / `once`
 - `time`: `HH:MM` 24 小时制
-- `date_param`: 周字段(`MON` / `TUE` / ...) 或单次日期(`2026-12-31`),按 `type` 用
-- `dates`: 月内多日(如 `["1", "15"]`),按 `type=monthly` 用
+- `dates`: **周几 / 月内日期**,**整数字符串数组**——`weekly` 用 `["1".."7"]`(**1=周一 … 7=周日**),`monthly` 用 `["1".."31"]`。`daily` / `once` 不用。
+- `date_param`: **单次执行的日期字符串**——`once` 用 `"YYYY-MM-DD"`。`daily` / `weekly` / `monthly` 不用。
+
+> ⚠️ **`weekly` 绝不要写 `date_param: "MON"`**(英文星期缩写)。后端 `from_schedule_params`(`cubemanus/src/utils/cron.py`)对 weekday 做 `int(...)`,传 `"MON"` 会在 `+create` 时 **HTTP 500**(`无效的调度参数: invalid literal for int() with base 10: 'MON'`)。周几一律用 `dates` 整数字符串(`["1"]`=周一);需要单选也可 `date_param: "1"`,但首选 `dates`。(2026-05-30 实测踩坑。)
 
 约束:
 - 后端 schema `ScheduleConfig.type` / `.time` 必填字符串;`date_param` / `dates` 可空
+- `dates` 元素是**整数字符串**(`"1"` 不是 `1`,也不是 `"MON"`)
 - `schedules` 整体可空(省略=不设推荐节律 / partial update=保留原节律)
 - 传时至少 1 条(`min_length=1`,空数组 422)
 
