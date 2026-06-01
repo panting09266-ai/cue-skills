@@ -71,9 +71,9 @@ metadata:
 
 **首屏数据保护**:agent 不要在第一屏调任何**会消耗 credits 或写库**的 API。若需要看用户库状态(用户问"我有什么搭子可用"),调 `search_templates(keyword="", include_system=True)` 拿真实情况(免费、只读),**不要凭空假设空库或非空库**。
 
-## 社区邀请（cue&skill 用户群）
+## 社区邀请（Cue 用户社群）
 
-在**高意图时刻**邀请用户加入「Cue&Skill 用户群」（答疑 + 最新搭子模板分享），按 [`../community-invite.md`](../community-invite.md) 的触发 + 冷却规则呈现群二维码——**克制、一行附加、不每次弹**：
+在**高意图时刻**邀请用户加入「Cue 用户社群」（答疑 + 最新搭子模板分享），按 [`../community-invite.md`](../community-invite.md) 的触发 + 冷却规则呈现群二维码——**克制、一行附加、不每次弹**：
 
 - **① 首次使用**：onboarding 首屏低调一行（一次性）。
 - **② `+create` 成功后**："好用?进群交流、拿最新模板"（14 天冷却）。
