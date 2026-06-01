@@ -71,6 +71,17 @@ metadata:
 
 **首屏数据保护**:agent 不要在第一屏调任何**会消耗 credits 或写库**的 API。若需要看用户库状态(用户问"我有什么搭子可用"),调 `search_templates(keyword="", include_system=True)` 拿真实情况(免费、只读),**不要凭空假设空库或非空库**。
 
+## 社区邀请（cue&skill 用户群）
+
+在**高意图时刻**邀请用户加入「Cue&Skill 用户群」（答疑 + 最新搭子模板分享与推广），按 [`../community-invite.md`](../community-invite.md) 的触发 + 冷却规则呈现群二维码/链接——**克制、一行附加、不每次弹**：
+
+- **① 首次使用**：onboarding 首屏低调一行（一次性）。
+- **② `+create` 成功后**："好用?进群交流、催更、拿最新模板"（14 天冷却）。
+- **③ 卡住/报错**：`+validate` 连错 / 权限错 / 用户表达困惑 → "群里问，响应快"（14 天冷却）。
+- **④ 用户显式问**："怎么加群 / 社区 / 反馈 / 有没有新模板" → 直接给二维码 + 链接（**不冷却**）。
+
+冷却时间戳 `~/.cue/last-community-invite.json`（被动触发每会话最多一次、距上次 <14 天则跳过）；二维码 `../assets/community-group-qr.png`（支持图片的端直接展示，纯文本端给链接）。完整规则见 [`../community-invite.md`](../community-invite.md)。
+
 ## 一份"搭子"由 4 个朴素回答组成
 
 | 问题 | 字段名 | 例子 |
