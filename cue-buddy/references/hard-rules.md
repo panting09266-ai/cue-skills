@@ -225,7 +225,7 @@ R1-R7 + R9 均有 `+validate` 自动检测,违反 `error` 级会拒绝 `+create 
 
 ### 为什么
 
-- 后端 reporter prompt(`cubemanus src/prompts/reporter.py:155/170/188` + `mimic.py:67/94`)和**前端报告渲染**都按 key `报告时间` 精确解析。字段名错,前端识别不到这行(或当成普通正文渲染),用户看不到生成时间。
+- 后端 reporter prompt 和**前端报告渲染**都按 key `报告时间` 精确解析。字段名错,前端识别不到这行(或当成普通正文渲染),用户看不到生成时间。
 - `YYYY年MM月DD日` 是 reporter LLM 识别的字面 pattern,reporter 会用后端环境变量 `{CURRENT_YEAR}/MONTH/DAY` 自动填入北京时间。换其他占位符,reporter 可能漏填,字面 `<由 LLM 填充>` 残留在交付报告里。
 - 位置上,前端期望它紧跟标题——放报告末尾时部分模板会被前端裁掉或位置错位。
 
@@ -249,7 +249,7 @@ R1-R7 + R9 均有 `+validate` 自动检测,违反 `error` 级会拒绝 `+create 
 
 ---
 
-## 设计意图（可读 [`buddies-architecture`](https://github.com/cubemanus/buddy-architecture)）
+## 设计意图
 
 铁律不是为了刁难，而是为了让搭子在以下场景**自动给力**：
 

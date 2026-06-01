@@ -250,7 +250,7 @@ def search_templates(
 ) -> list[dict]:
     """POST /api/templates/search — keyword search over templates.
 
-    Backend (cubemanus src/api/routes/template.py:753) accepts a
+    Backend accepts a
     TemplateShareRequest with `keyword` (str, stripped server-side),
     `include_system` (bool), and pagination. The underlying SQL only
     matches title + primary_category + secondary_category
@@ -277,7 +277,7 @@ def search_templates(
     return []
 
 
-# 后端 schema 字段(`src/api/schemas/template.py` CreateTemplateRequest /
+# 后端 schema 字段(CreateTemplateRequest /
 # UpdateTemplateRequest / CreateRecommendedTaskRequest)只支持 schedules,
 # DB 列 task_cron_expressions / task_configs 是 server-internal。client
 # 不应外发这两个 key。下面 _SCHEDULE_KEY_SET 用于 outbound payload 清理。
@@ -399,8 +399,7 @@ def _normalize_template_payload(payload: dict) -> dict:
 def create_template(payload: dict) -> dict:
     """Create a new user-owned template.
 
-    Payload schema (mirrors ``CreateTemplateRequest`` in cubemanus
-    ``src/api/schemas/template.py``):
+    Payload schema (mirrors the backend ``CreateTemplateRequest``):
 
       Required:
         source_conversation_id  - use "seed:<slug>:v1" for synthetic
@@ -451,7 +450,7 @@ def update_template(template_id: str, payload: dict) -> dict:
     Raises:
         ValueError: when ``task_input`` violates R9 「可执行」.
         CueAPIError: 400 if caller sends ONLY task_input/schedules
-            without a regular template field (cubemanus contract).
+            without a regular template field (backend contract).
     """
     body = _normalize_template_payload(payload)
     # PUT contract sanity: backend (template.py:598-599) rejects 400 if
@@ -530,7 +529,7 @@ def capabilities(
 ) -> dict | None:
     """GET /api/tools/capabilities — researcher surface inventory.
 
-    Backend: cubemanus tool_capabilities API (docs/tool_capabilities_api_2026_05_20.md).
+    Backend: tool_capabilities API.
 
     Args:
         fields: ``summary`` / ``default`` / ``debug``. Omit to use server-side
@@ -632,19 +631,17 @@ def set_template_frequent(template_id: str, is_frequent: bool = True) -> dict:
 def rewrite(input: str, device_type: str = "cli") -> dict:
     """POST /api/rewrite — apply rewrite_prompt to a raw user query.
 
-    Backend: cubemanus src/api/routes/rewrite.py:22 → rewrite_service
-    .generate_rewrite_with_profile (src/service/rewrite_service.py:108)
-    applies src/prompts/rewrite_prompt.py with the caller's USER_PROFILE.
+    Backend: the rewrite service applies the rewrite prompt with the
+    caller's USER_PROFILE.
 
     Returns the unwrapped RewriteData dict (matches set_template_frequent's
     `data["data"]` unwrap convention). Keys: `thinking`, `user_confirmation`
     (a confirm string to show the user), `task_node` (intent_tag,
     agent_persona, target_subject, search_methodology), `rewritten_mandate`
     (the structured mandate to send to /chat/stream), and `safety_flag`
-    (pii_masked list, risk_category). Per backend
-    `src/api/schemas/rewrite.py:RewriteData` the field is `thinking`,
-    NOT `_thinking` (rewrite_prompt.py's template-string nomenclature drifted
-    from the actual response schema).
+    (pii_masked list, risk_category). Per the backend RewriteData schema
+    the field is `thinking`, NOT `_thinking` (the prompt template-string
+    nomenclature drifted from the actual response schema).
 
     Used by cue-research's free-form path so privacy masking + public-source
     constraint + intent amplification apply — chat_stream itself does NOT
@@ -679,7 +676,7 @@ def rewrite(input: str, device_type: str = "cli") -> dict:
     payload = json.loads(raw) if raw else {}
     # Backend wraps in DataResponse(data=RewriteData(...)) — unwrap so the
     # caller gets {thinking, user_confirmation, task_node, rewritten_mandate,
-    # safety_flag} directly. See cubemanus src/api/routes/rewrite.py:85.
+    # safety_flag} directly.
     if isinstance(payload, dict) and isinstance(payload.get("data"), dict):
         return payload["data"]
     return payload or {}

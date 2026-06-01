@@ -21,7 +21,7 @@ jobs:
         # 加新 skill: 在这里 append skill 文件夹名,sibling 到 cue-buddy/
         # 每个 skill 须有 scripts/test_skill_regression.py + SKILL.md frontmatter
         skill: [cue-buddy, cue-research]
-        # 跟 cubemanus backend pinned 3.12 一致,plus 一个 rolling latest
+        # 跟 Cue 后端 pinned 3.12 一致,plus 一个 rolling latest
         python-version: ["3.12", "3.13"]
     steps:
       - uses: actions/checkout@v4
@@ -65,7 +65,7 @@ jobs:
       - name: (cue-buddy) cue_api client contract test (stdlib mock server)
         if: matrix.skill == 'cue-buddy'
         # codex r3: 把"capabilities 合约"放进 CI 而非只 local dev 可跑。
-        # http.server + threading mock,不依赖 cubemanus/uvicorn/fastapi。
+        # http.server + threading mock,不依赖后端/uvicorn/fastapi。
         # 验 client wire format:URL/Bearer/query 序列化/ETag 304/4xx 错误传播。
         run: python3 ${{ matrix.skill }}/scripts/test_cue_api_client_contract.py
 

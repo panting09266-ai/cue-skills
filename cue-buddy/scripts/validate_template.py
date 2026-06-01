@@ -645,7 +645,7 @@ def _known_scenes_from_capabilities() -> list[str] | None:
     `GET /api/tools/capabilities` (field `playbook_scenes`). Returns None when
     offline / no key / field absent — so `+validate` stays usable offline and
     never emits a false scene warning. The server is the single source of truth
-    (src/service/playbook_scenes.py)."""
+    for playbook scenes."""
     try:
         import cue_api  # same scripts/ dir; needs a key + network
 
@@ -686,8 +686,8 @@ def _check_scene_vocab(
 
 
 # R10: 报告时间字段约定 — 前端解析依赖 `报告时间: YYYY年MM月DD日` 字面。
-# 后端 reporter prompt (cubemanus src/prompts/reporter.py:155/170/188 + mimic.py)
-# emits this exact key; 前端按这个 key 渲染。变体如 `报告生成时间` / `生成时间` /
+# 后端 reporter prompt emits this exact key; 前端按这个 key 渲染。
+# 变体如 `报告生成时间` / `生成时间` /
 # `报告日期` / `生成日期` / `生成时刻` 一律不允许。
 _WRONG_TIME_FIELDS = (
     "报告生成时间", "生成时间", "报告日期", "生成日期", "生成时刻",
@@ -718,8 +718,7 @@ def _check_report_time_field(rf: str, out: list[Finding]) -> None:
                     "error",
                     "report_format",
                     f"R10: 字段名必须是 `报告时间`,不能是 `{wrong}` — 前端按 `报告时间` "
-                    f"精确解析,变体会让 FE 识别不到时间行(或渲染成普通正文)。"
-                    f"参考 cubemanus reporter.py:155/170/188",
+                    f"精确解析,变体会让 FE 识别不到时间行(或渲染成普通正文)。",
                 )
             )
     # (2) bad placeholder

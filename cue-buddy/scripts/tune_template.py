@@ -60,10 +60,8 @@ def build_user_requirement(current: dict, issues: str) -> str:
     Seed-bypass mode: backend uses ONLY user_requirement (no chat history).
     So we hand it the full current template + the desired fixes.
     """
-    # cubemanus contract phase (2026-05-20) — backend `agents/types.py:Template`
-    # 已 strict 输出 canonical `input_form_spec` 字段;`introduction` 字段已
-    # 在 alembic 20260520c (cubemanus MR !446) drop column。tune script
-    # 全量切到 canonical 命名。
+    # 后端契约改造后已 strict 输出 canonical `input_form_spec` 字段;
+    # `introduction` 字段已被 drop。tune script 全量切到 canonical 命名。
     current_form_spec = current.get("input_form_spec") or ""
     return (
         "请基于以下现有模板，按问题清单做最小且必要的修改，"
@@ -364,8 +362,8 @@ def main(argv: list[str] | None = None) -> int:
     # Backend strict schema emits canonical `input_form_spec`. We keep a
     # short-term `introduction` parse fallback for any stale snapshot that
     # might still surface the old key in the wild, but we do NOT write
-    # `introduction` back into merged — that column was dropped in
-    # cubemanus alembic 20260520c (PR-7b contract phase).
+    # `introduction` back into merged — that column was dropped in the
+    # backend contract phase.
     merged = {**current}
     # Strip any legacy key from inherited `current` so it never gets PUT back.
     merged.pop("introduction", None)

@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """End-to-end client contract validation for `cue_api.capabilities()`.
 
-Layer A (no real cubemanus backend needed): spin up a local cubemanus
-process **via its actual route module** to exercise the full client path —
+Layer A: spin up the local backend process **via its actual route module**
+to exercise the full client path —
 url construction, query param serialization, ETag echo + If-None-Match
 short-circuit, 4xx structured detail decoding, 304 → None convention.
 
@@ -11,7 +11,7 @@ This runs the real `/api/tools/capabilities` handler in-process and points
 
 Use when:
 - Touching cue_api.capabilities() signature/parsing
-- Touching cubemanus tool_capabilities.py / routes/tools.py contract
+- Touching the backend tool_capabilities / tools-route contract
 - Pre-merge gate: catches client/server schema drift before deploying
 
 Run:
@@ -31,21 +31,22 @@ from pathlib import Path
 _HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(_HERE))
 
-# Resolve cubemanus repo path. Convention: ~/work/cubemanus next to ~/work/cue-skills
-# Main repo (MR !456 + !457 hermetic fixes already merged dgts → master → prod
-# 2026-05-21, no need to point at any short-lived worktree).
-_CUBEMANUS_DIR = Path.home() / "work" / "cubemanus"
-if not _CUBEMANUS_DIR.exists():
-    print(f"[skip] cubemanus repo not found at {_CUBEMANUS_DIR}", file=sys.stderr)
+# Resolve the backend repo path from CUE_BACKEND_DIR (set it to your local
+# backend checkout). This Layer-A test only runs where the backend is present;
+# CI and contributors without it skip cleanly.
+_backend_env = os.environ.get("CUE_BACKEND_DIR")
+_BACKEND_DIR = Path(_backend_env) if _backend_env else None
+if not _BACKEND_DIR or not _BACKEND_DIR.exists():
+    print("[skip] backend repo not found — set CUE_BACKEND_DIR to run this test", file=sys.stderr)
     sys.exit(0)
-sys.path.insert(0, str(_CUBEMANUS_DIR))
+sys.path.insert(0, str(_BACKEND_DIR))
 
 
 def _start_minimal_backend() -> tuple[str, threading.Thread]:
     """Spin up FastAPI on a free port with only the tools router mounted.
 
-    Reuses the same hermetic pattern as
-    cubemanus/tests/test_tool_capabilities_api.py (post-MR !455).
+    Reuses the same hermetic pattern as the backend's own
+    tool-capabilities API test.
     """
     import socket
 
@@ -66,7 +67,7 @@ def _start_minimal_backend() -> tuple[str, threading.Thread]:
         print(
             f"[NOT VERIFIED] capabilities contract not exercised — "
             f"uvicorn + fastapi missing ({e}).\n"
-            f"       install: pip install uvicorn fastapi (or run in cubemanus .venv)\n"
+            f"       install: pip install uvicorn fastapi (or run in the backend .venv)\n"
             f"       to silence in non-CI dev env: export CUE_SKILL_TEST_SKIP_OK=1",
             file=sys.stderr,
         )
@@ -171,7 +172,7 @@ class Case4_ETagRoundTrip(unittest.TestCase):
         first = capabilities()
         self.assertIn("_etag", first, "server must emit ETag header")
         etag = first["_etag"]
-        # Weak validator per RFC 7232 §2.3 (cubemanus emits W/"...")
+        # Weak validator per RFC 7232 §2.3 (backend emits W/"...")
         self.assertTrue(etag.startswith('W/"'), f"expected weak ETag, got {etag!r}")
 
         second = capabilities(if_none_match=etag)

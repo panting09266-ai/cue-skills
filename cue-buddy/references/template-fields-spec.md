@@ -238,7 +238,7 @@
 ```
 
 **铁律(违反会影响前端渲染):**
-- 字段名**只能是 `报告时间`**——不是 `报告生成时间`、不是 `生成时间`、不是 `报告日期`。后端 reporter prompt(`cubemanus src/prompts/reporter.py:155/170/188` + `mimic.py:67/94`)和前端解析都钉死了这个 key。
+- 字段名**只能是 `报告时间`**——不是 `报告生成时间`、不是 `生成时间`、不是 `报告日期`。后端 reporter prompt 和前端解析都钉死了这个 key。
 - 格式**写字面 `YYYY年MM月DD日`**(不要用 `<由 LLM 填充>` 或 `{CURRENT_DATE}` 等自创占位符)。reporter LLM 识别这个 pattern 并填入当前北京时间。
 - 位置:**主标题的下一行**(不是报告末尾)。
 - 不带 `>` 引用块前缀,也不放进免责声明块。
@@ -367,7 +367,7 @@
 - `dates`: **周几 / 月内日期**,**整数字符串数组**——`weekly` 用 `["1".."7"]`(**1=周一 … 7=周日**),`monthly` 用 `["1".."31"]`。`daily` / `once` 不用。
 - `date_param`: **单次执行的日期字符串**——`once` 用 `"YYYY-MM-DD"`。`daily` / `weekly` / `monthly` 不用。
 
-> ⚠️ **`weekly` 绝不要写 `date_param: "MON"`**(英文星期缩写)。后端 `from_schedule_params`(`cubemanus/src/utils/cron.py`)对 weekday 做 `int(...)`,传 `"MON"` 会在 `+create` 时 **HTTP 500**(`无效的调度参数: invalid literal for int() with base 10: 'MON'`)。周几一律用 `dates` 整数字符串(`["1"]`=周一);需要单选也可 `date_param: "1"`,但首选 `dates`。(2026-05-30 实测踩坑。)
+> ⚠️ **`weekly` 绝不要写 `date_param: "MON"`**(英文星期缩写)。后端调度解析对 weekday 做 `int(...)`,传 `"MON"` 会在 `+create` 时 **HTTP 500**(`无效的调度参数: invalid literal for int() with base 10: 'MON'`)。周几一律用 `dates` 整数字符串(`["1"]`=周一);需要单选也可 `date_param: "1"`,但首选 `dates`。(2026-05-30 实测踩坑。)
 
 约束:
 - 后端 schema `ScheduleConfig.type` / `.time` 必填字符串;`date_param` / `dates` 可空
