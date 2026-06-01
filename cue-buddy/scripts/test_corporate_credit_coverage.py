@@ -10,7 +10,7 @@ The buddy author flow (`+author`) needs to translate template
 categories so it can warn when a required evidence source has no tool
 support. This script exercises that mapping by:
 
-1. Spinning the cubemanus capabilities route in-process (same hermetic
+1. Spinning the backend capabilities route in-process (same hermetic
    pattern as test_capabilities_client.py).
 2. For each dimension declared in corporate-credit.md ``search_plan``,
    querying the API with key terms drawn from the 数据路由 list.
@@ -34,14 +34,14 @@ from pathlib import Path
 _HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(_HERE))
 
-# Use the worktree that contains MR !456 + !457 hermetic fixes until
-# they reach main repo on next dgts pull.
-# Main repo (all hermetic + trigger fixes merged via MR !456 / !457 / !458 / !459).
-_CUBEMANUS_DIR = Path.home() / "work" / "cubemanus"
-if not _CUBEMANUS_DIR.exists():
-    print(f"[skip] cubemanus repo not found at {_CUBEMANUS_DIR}", file=sys.stderr)
+# Resolve the backend repo path from CUE_BACKEND_DIR (set it to your local
+# backend checkout). Only runs where the backend is present; CI/others skip.
+_backend_env = os.environ.get("CUE_BACKEND_DIR")
+_BACKEND_DIR = Path(_backend_env) if _backend_env else None
+if not _BACKEND_DIR or not _BACKEND_DIR.exists():
+    print("[skip] backend repo not found — set CUE_BACKEND_DIR to run this test", file=sys.stderr)
     sys.exit(0)
-sys.path.insert(0, str(_CUBEMANUS_DIR))
+sys.path.insert(0, str(_BACKEND_DIR))
 
 
 # Coverage map: dimension → list of probe terms drawn from the template's
@@ -98,7 +98,7 @@ def _start_minimal_backend() -> str:
         print(
             f"[NOT VERIFIED] coverage probe not exercised — "
             f"uvicorn + fastapi missing ({e}).\n"
-            f"       install: pip install uvicorn fastapi (or run in cubemanus .venv)\n"
+            f"       install: pip install uvicorn fastapi (or run in the backend .venv)\n"
             f"       to silence in non-CI dev env: export CUE_SKILL_TEST_SKIP_OK=1",
             file=sys.stderr,
         )

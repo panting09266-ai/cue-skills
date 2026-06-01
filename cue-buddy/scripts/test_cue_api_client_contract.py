@@ -2,11 +2,11 @@
 """Stdlib-only contract test for `cue_api.capabilities()` HTTP client.
 
 Codex r3 finding: `test_capabilities_client.py` 和 `test_corporate_credit_coverage.py`
-需要 cubemanus repo 在本地 + uvicorn + fastapi,CI 跑不到,capabilities
+需要后端 repo 在本地 + uvicorn + fastapi,CI 跑不到,capabilities
 合约从未在 CI 真正被验证(只能 local dev 验)。
 
 本 test 用 stdlib `http.server` + threading 起一个 mock server,fake
-cubemanus tool_capabilities API 的 response shape,然后跑 cue_api
+后端 tool_capabilities API 的 response shape,然后跑 cue_api
 client 端到端,验证 client wire format 全套:
   - URL 拼接 (base + /tools/capabilities + query string)
   - Bearer auth header
@@ -15,7 +15,7 @@ client 端到端,验证 client wire format 全套:
   - If-None-Match → 304 → returns None
   - 4xx → CueAPIError with parsed detail dict
 
-CI 友好 (stdlib only),不需要 cubemanus repo / uvicorn / fastapi。
+CI 友好 (stdlib only),不需要后端 repo / uvicorn / fastapi。
 """
 
 from __future__ import annotations
@@ -73,8 +73,8 @@ def mock_server(handler_fn):
         srv.server_close()  # close the listening socket (silences ResourceWarning)
 
 
-# Canned capabilities payload (shape mirrors cubemanus
-# tool_capabilities.py:build_researcher_capabilities()).
+# Canned capabilities payload (shape mirrors the backend
+# build_researcher_capabilities() output).
 _CANNED_PAYLOAD = {
     "schema_version": 1,
     "api_version": "2026-05-20",
@@ -385,7 +385,7 @@ class Case7_Rewrite(unittest.TestCase):
             length = int(req.headers.get("Content-Length", "0"))
             captured["body"] = json.loads(req.rfile.read(length))
             # Mirror the REAL backend wire shape: DataResponse wrapper around
-            # RewriteData. cubemanus src/api/routes/rewrite.py:85 returns
+            # RewriteData. The backend returns
             # `DataResponse(data=RewriteData(...))` and the field is `thinking`,
             # NOT `_thinking` (codex code review caught this drift).
             body = {

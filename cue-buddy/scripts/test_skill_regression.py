@@ -2,10 +2,10 @@
 """Skill-level regression tests (stdlib only, no pytest needed).
 
 Run after editing tune_template.py / cue_api.py / validate_template.py to
-catch drift against the cubemanus public API contract. Covers codex
-!450 r3 review findings:
+catch drift against the Cue public API contract. Covers codex
+review findings:
 
-1. +tune prompt 不能再含 `introduction`(cubemanus contract phase 已落地)
+1. +tune prompt 不能再含 `introduction`(后端契约改造已落地)
 2. cue_api 接受 legacy `task_configs` payload 转换为 `schedules`
 3. search_plan 某个维度缺三件套 → error(block-level)
 4. report_format 某节缺执行蓝图 → error(block-level)
