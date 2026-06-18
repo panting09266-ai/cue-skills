@@ -37,12 +37,16 @@ metadata:
   ```
   之后 runner = `~/.cue/cue-skills/cue-research/scripts/research_run.py`。需 `git` + `python3`（runner 仅用标准库）。
 
-## 怎么跑（搭子是动态的，运行时查 live）
-1. **拉本场景当前搭子**：`GET https://cuecue.cn/api/playbook`，找 `secondary_category == "商机挖掘"` 的 scene，确认 `title == "产业链上下游拓客"` 的搭子是否在列。若该场景当前不在返回里（临时未达展示门槛）→ 告知用户暂不可用。
-2. **选一个搭子**：**委托 cue-research 的匹配逻辑**（其 `+match`/Stage-2：对 `goal` 做语义匹配、把用户的具体主体从匹配中剥离、弱命中先列 ≤2 候选确认）——不要只按字面 title 关键词裸选。取选中搭子的 `template_id`。
-3. **确认 credits（强制）**：跑深度研究消耗 credits。运行前显式问用户「将用搭子 X 跑【主体】，耗 credits，是否继续？」并等确认。
-4. **跑**：`python3 ~/.cue/cue-skills/cue-research/scripts/research_run.py --query "<链主主体名称>" --template-id <template_id>`（用上一节就绪的 runner 路径；已装 cue-skills 则用你本地的 `cue-research/scripts/research_run.py`）。深度研究 3–15 分钟；长跑 live 流常不带报告段，用 replay 取最终报告。 读 runner 末行 `RESULT ok|empty`：`empty` → 告知用户本次未取到内容、可换主体/搭子重试，**不要编造**。
-5. **回报**：把带来源链接的报告交给用户，不去掉来源、不杜撰。
+## 怎么跑
+1. **确认 credits（强制）**：跑深度研究消耗 credits。运行前显式问用户「将用「产业链上下游拓客」跑【链主主体】，耗 credits，是否继续？」并等确认。
+2. **跑**：直接指定本搭子 `template_AKRtET`，无需拉场景选搭子：
+   ```bash
+   python3 ~/.cue/cue-skills/cue-research/scripts/research_run.py \
+     --query "<链主主体名称>" \
+     --template-id template_AKRtET
+   ```
+   （用上一节就绪的 runner 路径；已装 cue-skills 则用你本地的 `cue-research/scripts/research_run.py`）。深度研究 3–15 分钟；长跑 live 流常不带报告段，用 replay 取最终报告。 读 runner 末行 `RESULT ok|empty`：`empty` → 告知用户本次未取到内容、可换主体重试，**不要编造**。
+3. **回报**：把带来源链接的报告交给用户，不去掉来源、不杜撰。
 
 ## 前置
 - Cue 账号 API key（cue CLI 登录后在 `~/.cue/config.json`，runner 自动读）；新账号送免费积分（注册 50 + 每天 10），可先免费试。
